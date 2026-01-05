@@ -2,8 +2,8 @@
 
 #include <fstream>
 #include <ios>
-#include <string>
 #include <iostream>
+#include <string>
 
 #include "src/core/column.h"
 #include "src/util/assert.h"
