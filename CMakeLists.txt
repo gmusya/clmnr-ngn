@@ -6,3 +6,4 @@ include(cmake/compile.cmake)
 include(cmake/dependencies.cmake)
 
 add_subdirectory(src)
+add_subdirectory(exe)

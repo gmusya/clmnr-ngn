@@ -1,4 +1,4 @@
-#include "src/core/columnar_file.h"
+#include "src/core/columnar.h"
 
 #include <cstdio>
 #include <filesystem>

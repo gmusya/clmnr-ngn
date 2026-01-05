@@ -17,7 +17,7 @@ class CsvReader {
     Options() {}
   };
 
-  CsvReader(const std::string &filename, Options options = Options{}) : file_(filename), options_(options) {
+  CsvReader(const std::string& filename, Options options = Options{}) : file_(filename), options_(options) {
     ASSERT(file_.good());
   }
 
@@ -52,6 +52,35 @@ class CsvReader {
   // handling
   std::ifstream file_;
 
+  Options options_{};
+};
+
+class CsvWriter {
+ public:
+  struct Options {
+    char delimiter = ',';
+
+    Options() {}
+  };
+
+  CsvWriter(const std::string& filename, Options options = Options{}) : file_(filename), options_(options) {}
+
+  using Row = std::vector<std::string>;
+
+  void WriteRow(const Row& row) {
+    bool is_first = true;
+    for (const auto& value : row) {
+      if (!is_first) {
+        file_ << options_.delimiter;
+      }
+      file_ << value;
+      is_first = false;
+    }
+    file_ << std::endl;
+  }
+
+ private:
+  std::ofstream file_;
   Options options_{};
 };
 
