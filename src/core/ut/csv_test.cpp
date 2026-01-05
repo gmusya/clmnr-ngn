@@ -54,7 +54,7 @@ TEST(CsvWriter, Simple) {
   writer.WriteRow({"", "", "z"});
 
   std::ifstream file(path);
-  
+
   std::vector<std::string> lines;
   std::string line;
   while (std::getline(file, line)) {
