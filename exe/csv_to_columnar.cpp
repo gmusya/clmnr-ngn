@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
   for (auto row = reader.ReadNext(); row.has_value(); row = reader.ReadNext()) {
     if (columns.empty()) {
       columns.reserve(row.value().size());
-      for (const auto& _ : row.value()) {
+      for (size_t i = 0; i < row.value().size(); ++i) {
         columns.emplace_back(std::vector<int64_t>());
       }
     }
@@ -45,4 +45,6 @@ int main(int argc, char** argv) {
   }
 
   std::move(writer).Finalize();
+
+  return 0;
 }
