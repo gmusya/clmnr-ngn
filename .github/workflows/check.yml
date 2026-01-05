@@ -1,0 +1,35 @@
+name: format, build and test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-solutions-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: fetch dependencies
+      run: |
+        sudo apt-get install clang-format clang-tidy
+    - name: clang format
+      run : |
+        script/format.sh
+    - name: cmake
+      run: |
+        mkdir build
+        cd build
+        cmake -GNinja -DCMAKE_BUILD_TYPE=Debug ..
+    - name: make
+      run: |
+        cd build
+        ninja
+    - name: clang tidy
+      run : |
+        script/tidy.sh
+    - name: test
+      run: |
+        cd build
+        ./src/core/ngn-csv-test
