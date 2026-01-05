@@ -22,4 +22,4 @@ llvm-cov-20 show \
   build-coverage/src/core/ngn-csv-test \
   -instr-profile=build-coverage/coverage.profdata \
   -format=html -output-dir=build-coverage/coverage-html \
-  -ignore-filename-regex='(/_deps/)'
+  -ignore-filename-regex='(/_deps/|test)'
