@@ -6,12 +6,14 @@
 
 ABSL_FLAG(std::string, input, "", "Input columnar file");
 ABSL_FLAG(std::string, output, "", "Output CSV file");
+ABSL_FLAG(std::string, schema, "", "Schema file");
 
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
 
   std::string input = absl::GetFlag(FLAGS_input);
   std::string output = absl::GetFlag(FLAGS_output);
+  std::string schema = absl::GetFlag(FLAGS_schema);
 
   if (input.empty()) {
     std::cerr << "Input file is required" << std::endl;
@@ -23,13 +25,18 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  if (schema.empty()) {
+    std::cerr << "Schema file is required" << std::endl;
+    return 1;
+  }
+
   ngn::FileReader reader(input);
   ngn::CsvWriter writer(output);
 
   std::vector<ngn::Column> columns;
 
   for (size_t i = 0; i < reader.ColumnCount(); ++i) {
-    columns.emplace_back(reader.Column(i));
+    columns.emplace_back(reader.ReadColumn(i));
   }
 
   if (columns.empty()) {
@@ -38,18 +45,19 @@ int main(int argc, char** argv) {
   }
 
   for (size_t i = 0; i < columns.size(); ++i) {
-    if (columns[0].Values().size() != columns[i].Values().size()) {
+    if (columns[0].Size() != columns[i].Size()) {
       std::cerr << "All columns must have the same size" << std::endl;
       return 1;
     }
   }
 
-  size_t rows_count = columns[0].Values().size();
+  size_t rows_count = columns[0].Size();
 
   for (size_t i = 0; i < rows_count; ++i) {
     ngn::CsvWriter::Row row;
     for (size_t j = 0; j < columns.size(); ++j) {
-      row.emplace_back(std::to_string(columns[j].Values()[i]));
+      ngn::Value value = columns[j][i];
+      row.emplace_back(value.ToString());
     }
     writer.WriteRow(row);
   }

@@ -1,19 +1,41 @@
 #pragma once
 
 #include <cstdint>
+#include <variant>
 #include <vector>
+
+#include "src/core/type.h"
+#include "src/core/value.h"
+#include "src/util/macro.h"
 
 namespace ngn {
 
 class Column {
  public:
-  explicit Column(std::vector<int64_t> values) : values_(std::move(values)) {}
+  using GenericColumn = std::variant<ArrayType<Type::kInt64>, ArrayType<Type::kString>>;
 
-  std::vector<int64_t>& Values() { return values_; }
-  const std::vector<int64_t>& Values() const { return values_; }
+  explicit Column(ArrayType<Type::kInt64> values) : values_(std::move(values)) {}
+  explicit Column(ArrayType<Type::kString> values) : values_(std::move(values)) {}
+
+  GenericColumn& Values() { return values_; }
+  const GenericColumn& Values() const { return values_; }
+
+  Value operator[](size_t index) const {
+    return std::visit([index]<Type type>(const ArrayType<type>& arr) { return Value(arr[index]); }, values_);
+  }
+
+  Type GetType() const {
+    return std::visit([]<Type type>(const ArrayType<type>&) { return type; }, values_);
+  }
+
+  size_t Size() const {
+    return std::visit([](const auto& arr) { return arr.size(); }, values_);
+  }
+
+  bool operator==(const Column& other) const = default;
 
  private:
-  std::vector<int64_t> values_;
+  GenericColumn values_;
 };
 
 }  // namespace ngn
