@@ -14,6 +14,8 @@ enum class Type {
 struct Field {
   std::string name;
   Type type;
+
+  bool operator==(const Field& other) const = default;
 };
 
 class Schema {
