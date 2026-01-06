@@ -61,6 +61,8 @@ Column EvaluateBinary(std::shared_ptr<Batch> batch, std::shared_ptr<Binary> expr
       return LessOrEqual(lhs, rhs);
     case BinaryFunction::kGreaterOrEqual:
       return GreaterOrEqual(lhs, rhs);
+    default:
+      THROW_NOT_IMPLEMENTED;
   }
 }
 
