@@ -114,6 +114,33 @@ class FileWriter {
   std::vector<Column> columns_;
 };
 
+namespace internal {
+template <Type type>
+ArrayType<type> ReadColumn(std::ifstream& input);
+
+template <>
+ArrayType<Type::kString> ReadColumn(std::ifstream& input) {
+  int64_t size = Read<int64_t>(input);
+  ArrayType<Type::kString> result;
+  result.reserve(size);
+  for (int64_t i = 0; i < size; ++i) {
+    result.emplace_back(Read<std::string>(input));
+  }
+  return result;
+}
+
+template <>
+ArrayType<Type::kInt64> ReadColumn(std::ifstream& input) {
+  int64_t size = Read<int64_t>(input);
+  ArrayType<Type::kInt64> result;
+  result.reserve(size);
+  for (int64_t i = 0; i < size; ++i) {
+    result.emplace_back(Read<int64_t>(input));
+  }
+  return result;
+}
+}  // namespace internal
+
 class FileReader {
  public:
   explicit FileReader(const std::string& path)
@@ -143,38 +170,12 @@ class FileReader {
 
     switch (metadata_.GetSchema().Fields()[idx].type) {
       case Type::kInt64:
-        return Column(ReadColumn<Type::kInt64>(file_));
+        return Column(internal::ReadColumn<Type::kInt64>(file_));
       case Type::kString:
-        return Column(ReadColumn<Type::kString>(file_));
+        return Column(internal::ReadColumn<Type::kString>(file_));
       default:
         THROW_NOT_IMPLEMENTED;
     }
-  }
-
- private:
-  template <Type type>
-  ArrayType<type> ReadColumn(std::ifstream& input) const;
-
-  template <>
-  ArrayType<Type::kString> ReadColumn(std::ifstream& input) const {
-    int64_t size = Read<int64_t>(input);
-    ArrayType<Type::kString> result;
-    result.reserve(size);
-    for (int64_t i = 0; i < size; ++i) {
-      result.emplace_back(Read<std::string>(input));
-    }
-    return result;
-  }
-
-  template <>
-  ArrayType<Type::kInt64> ReadColumn(std::ifstream& input) const {
-    int64_t size = Read<int64_t>(input);
-    ArrayType<Type::kInt64> result;
-    result.reserve(size);
-    for (int64_t i = 0; i < size; ++i) {
-      result.emplace_back(Read<int64_t>(input));
-    }
-    return result;
   }
 
  private:
