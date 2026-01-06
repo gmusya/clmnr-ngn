@@ -13,8 +13,8 @@ class Value {
   explicit Value(PhysicalType<Type::kInt64> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kString> value) : value_(std::move(value)) {}
 
-  GenericValue& Values() { return value_; }
-  const GenericValue& Values() const { return value_; }
+  GenericValue& GetValue() { return value_; }
+  const GenericValue& GetValue() const { return value_; }
 
   std::string ToString() const {
     return std::visit(
