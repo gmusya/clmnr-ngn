@@ -10,11 +10,11 @@ namespace ngn {
 class Batch {
  public:
   Batch(std::vector<Column> columns, Schema schema) : columns_(std::move(columns)), schema_(std::move(schema)) {
-    ASSERT(!columns.empty());
-    ASSERT(schema.Fields().size() == columns.size());
+    ASSERT(!columns_.empty());
+    ASSERT(schema_.Fields().size() == columns_.size());
 
-    for (size_t i = 0; i < columns.size(); ++i) {
-      ASSERT(columns[i].GetType() == schema.Fields()[i].type);
+    for (size_t i = 0; i < columns_.size(); ++i) {
+      ASSERT(columns_[i].GetType() == schema_.Fields()[i].type);
     }
   }
 
