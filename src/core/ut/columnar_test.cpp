@@ -31,9 +31,9 @@ TEST(ColumnarFile, Simple) {
 
   ASSERT_EQ(reader.ColumnCount(), 3);
 
-  ASSERT_EQ(reader.ReadColumn(0), col1);
-  ASSERT_EQ(reader.ReadColumn(1), col2);
-  ASSERT_EQ(reader.ReadColumn(2), col3);
+  EXPECT_EQ(reader.ReadColumn(0), col1);
+  EXPECT_EQ(reader.ReadColumn(1), col2);
+  EXPECT_EQ(reader.ReadColumn(2), col3);
 
   ASSERT_ANY_THROW(reader.ReadColumn(3));
 }
@@ -58,8 +58,8 @@ TEST(ColumnarFile, Types) {
 
   ASSERT_EQ(reader.ColumnCount(), 2);
 
-  ASSERT_EQ(reader.ReadColumn(0), col1);
-  ASSERT_EQ(reader.ReadColumn(1), col2);
+  EXPECT_EQ(reader.ReadColumn(0), col1);
+  EXPECT_EQ(reader.ReadColumn(1), col2);
 }
 
 }  // namespace ngn

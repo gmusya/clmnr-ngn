@@ -138,47 +138,41 @@ class FileReader {
     uint64_t column_count = ColumnCount();
     ASSERT(idx < column_count);
 
-    // Type type = metadata_.GetSchema().Fields()[idx].type;
-
-    constexpr int64_t kShift = sizeof(uint64_t);
-    file_.seekg(-(1 + column_count - idx) * kShift, std::ios::end);
-
-    uint64_t offset;
-    file_.read(reinterpret_cast<char*>(&offset), sizeof(offset));
-
+    int64_t offset = metadata_.GetOffsets()[idx];
     file_.seekg(offset, std::ios::beg);
 
-    uint64_t size;
-    file_.read(reinterpret_cast<char*>(&size), sizeof(size));
-
-    std::vector<int64_t> values(size);
-    file_.read(reinterpret_cast<char*>(values.data()), sizeof(values[0]) * size);
-
-    return Column(ArrayType<Type::kInt64>(std::move(values)));
+    switch (metadata_.GetSchema().Fields()[idx].type) {
+      case Type::kInt64:
+        return Column(ReadColumn<Type::kInt64>(file_));
+      case Type::kString:
+        return Column(ReadColumn<Type::kString>(file_));
+      default:
+        THROW_NOT_IMPLEMENTED;
+    }
   }
 
  private:
   template <Type type>
-  ArrayType<type> ReadColumn(std::ifstream& input);
+  ArrayType<type> ReadColumn(std::ifstream& input) const;
 
   template <>
-  ArrayType<Type::kString> ReadColumn(std::ifstream& input) {
+  ArrayType<Type::kString> ReadColumn(std::ifstream& input) const {
     int64_t size = Read<int64_t>(input);
     ArrayType<Type::kString> result;
     result.reserve(size);
     for (int64_t i = 0; i < size; ++i) {
-      result[i] = Read<std::string>(input);
+      result.emplace_back(Read<std::string>(input));
     }
     return result;
   }
 
   template <>
-  ArrayType<Type::kInt64> ReadColumn(std::ifstream& input) {
+  ArrayType<Type::kInt64> ReadColumn(std::ifstream& input) const {
     int64_t size = Read<int64_t>(input);
     ArrayType<Type::kInt64> result;
     result.reserve(size);
     for (int64_t i = 0; i < size; ++i) {
-      result[i] = Read<int64_t>(input);
+      result.emplace_back(Read<int64_t>(input));
     }
     return result;
   }
