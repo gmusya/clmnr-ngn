@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
   }
 
   ngn::Schema schema = ngn::Schema::FromFile(schema_file);
-  ASSERT(schema.Fields().size() > 0);
+  ASSERT(!schema.Fields().empty());
 
   ngn::CsvReader reader(input);
   ngn::FileWriter writer(output, schema);
