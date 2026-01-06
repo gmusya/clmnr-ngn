@@ -14,3 +14,11 @@ add_executable(ngn-exec-test
 )
 
 target_link_libraries(ngn-exec-test PUBLIC ngn-exec gtest_main)
+
+################################################################################
+
+add_executable(ngn-exec-bench
+  bench/kernel_bench.cpp
+)
+
+target_link_libraries(ngn-exec-bench PUBLIC ngn-exec benchmark::benchmark_main)
