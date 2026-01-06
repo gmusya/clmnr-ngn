@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "src/core/column.h"
 #include "src/core/schema.h"
 
