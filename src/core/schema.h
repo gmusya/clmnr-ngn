@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "src/core/type.h"
+#include "src/util/assert.h"
 
 namespace ngn {
 
@@ -40,8 +41,15 @@ class Schema {
     return Schema(fields);
   }
 
+  void ToFile(const std::string& path) {
+    std::ofstream file(path);
+    ASSERT(file.good());
+    file << Serialize();
+  }
+
   static Schema FromFile(const std::string& path) {
     std::ifstream file(path);
+    ASSERT(file.good());
     std::stringstream ss;
     ss << file.rdbuf();
     return Deserialize(ss.str());
