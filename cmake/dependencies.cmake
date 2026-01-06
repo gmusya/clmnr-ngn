@@ -17,3 +17,12 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(absl)
+
+FetchContent_Declare(
+  benchmark
+  SYSTEM
+  GIT_REPOSITORY https://github.com/google/benchmark.git
+  GIT_TAG        v1.9.4
+)
+
+FetchContent_MakeAvailable(benchmark)
