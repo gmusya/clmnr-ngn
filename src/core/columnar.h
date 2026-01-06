@@ -6,13 +6,59 @@
 #include <string>
 
 #include "src/core/column.h"
+#include "src/core/schema.h"
+#include "src/core/serde.h"
+#include "src/core/type.h"
 #include "src/util/assert.h"
+#include "src/util/macro.h"
 
 namespace ngn {
 
+class Metadata {
+ public:
+  Metadata(Schema schema, std::vector<int64_t> offsets) : schema_(std::move(schema)), offsets_(std::move(offsets)) {}
+
+  std::string Serialize() const {
+    std::stringstream out;
+    std::string serialized_schema = schema_.Serialize();
+    Write(serialized_schema, out);
+
+    int64_t sz = offsets_.size();
+    Write(sz, out);
+
+    for (int64_t offset : offsets_) {
+      Write(offset, out);
+    }
+
+    return out.str();
+  }
+
+  static Metadata Deserialize(const std::string& data) {
+    std::stringstream in(data);
+    std::string serialized_schema = Read<std::string>(in);
+    Schema schema = Schema::Deserialize(serialized_schema);
+
+    int64_t sz = Read<int64_t>(in);
+    std::vector<int64_t> offsets(sz);
+
+    for (size_t i = 0; i < offsets.size(); ++i) {
+      offsets[i] = Read<int64_t>(in);
+    }
+
+    return Metadata(std::move(schema), std::move(offsets));
+  }
+
+  const Schema& GetSchema() const { return schema_; }
+  const std::vector<int64_t>& GetOffsets() const { return offsets_; }
+
+ private:
+  Schema schema_;
+  std::vector<int64_t> offsets_;
+};
+
 class FileWriter {
  public:
-  explicit FileWriter(const std::string& path) : path_(path) {}
+  explicit FileWriter(const std::string& path, Schema schema) : path_(path), schema_(std::move(schema)) {}
 
   void AppendColumn(Column column) { columns_.emplace_back(std::move(column)); }
 
@@ -20,53 +66,79 @@ class FileWriter {
     std::ofstream output(path_);
     ASSERT(output.good());
 
-    std::vector<uint64_t> column_offsets;
+    ASSERT(schema_.Fields().size() == columns_.size());
 
-    for (auto& column : columns_) {
-      auto& values = column.Values();
+    std::vector<int64_t> column_offsets;
+
+    for (size_t i = 0; i < columns_.size(); ++i) {
+      const auto& column = columns_[i];
+      ASSERT(column.GetType() == schema_.Fields()[i].type);
 
       column_offsets.emplace_back(output.tellp());
 
-      uint64_t size = values.size();
-      output.write(reinterpret_cast<const char*>(&size), sizeof(size));
-      output.write(reinterpret_cast<const char*>(values.data()), values.size() * sizeof(values[0]));
+      std::visit([this, &output](const auto& typed_column) { this->WriteColumn(typed_column, output); },
+                 column.Values());
     }
 
     {
-      uint64_t size = column_offsets.size();
-      output.write(reinterpret_cast<const char*>(&size), sizeof(size));
-      output.write(reinterpret_cast<const char*>(column_offsets.data()),
-                   column_offsets.size() * sizeof(column_offsets[0]));
-    }
+      std::string serialized_metadata = Metadata(schema_, column_offsets).Serialize();
+      Write(serialized_metadata, output);
 
-    uint64_t columns_count = columns_.size();
-    output.write(reinterpret_cast<const char*>(&columns_count), sizeof(columns_count));
+      int64_t metadata_size = serialized_metadata.size() + sizeof(int64_t);
+      Write(metadata_size, output);
+    }
 
     output.close();
   }
 
  private:
+  template <Type type>
+  void WriteColumnCommon(const ArrayType<type>& values, std::ofstream& output) {
+    int64_t size = values.size();
+    Write(size, output);
+    for (const auto& value : values) {
+      Write(value, output);
+    }
+  }
+
+  void WriteColumn(const ArrayType<Type::kInt64>& values, std::ofstream& output) {
+    WriteColumnCommon<Type::kInt64>(values, output);
+  }
+
+  void WriteColumn(const ArrayType<Type::kString>& values, std::ofstream& output) {
+    WriteColumnCommon<Type::kString>(values, output);
+  }
+
   std::string path_;
+  Schema schema_;
   std::vector<Column> columns_;
 };
 
 class FileReader {
  public:
-  explicit FileReader(const std::string& path) : file_(path) { ASSERT(file_.good()); }
+  explicit FileReader(const std::string& path)
+      : file_(path), metadata_([&]() {
+          ASSERT(file_.good());
 
-  uint64_t ColumnCount() const {
-    constexpr int64_t kShift = sizeof(uint64_t);
-    file_.seekg(-kShift, std::ios::end);
+          constexpr int64_t kShift = sizeof(int64_t);
+          file_.seekg(-kShift, std::ios::end);
 
-    uint64_t columns_count;
-    file_.read(reinterpret_cast<char*>(&columns_count), sizeof(columns_count));
+          int64_t metadata_size = Read<int64_t>(file_);
+          file_.seekg(-(metadata_size + kShift), std::ios::end);
 
-    return columns_count;
-  }
+          std::string serialized_metadata = Read<std::string>(file_);
+          ASSERT(metadata_size == static_cast<int64_t>(serialized_metadata.size() + sizeof(int64_t)));
 
-  std::vector<int64_t> Column(uint64_t idx) const {
+          return Metadata::Deserialize(serialized_metadata);
+        }()) {}
+
+  uint64_t ColumnCount() const { return metadata_.GetOffsets().size(); }
+
+  Column ReadColumn(uint64_t idx) const {
     uint64_t column_count = ColumnCount();
     ASSERT(idx < column_count);
+
+    // Type type = metadata_.GetSchema().Fields()[idx].type;
 
     constexpr int64_t kShift = sizeof(uint64_t);
     file_.seekg(-(1 + column_count - idx) * kShift, std::ios::end);
@@ -82,11 +154,38 @@ class FileReader {
     std::vector<int64_t> values(size);
     file_.read(reinterpret_cast<char*>(values.data()), sizeof(values[0]) * size);
 
-    return values;
+    return Column(ArrayType<Type::kInt64>(std::move(values)));
+  }
+
+ private:
+  template <Type type>
+  ArrayType<type> ReadColumn(std::ifstream& input);
+
+  template <>
+  ArrayType<Type::kString> ReadColumn(std::ifstream& input) {
+    int64_t size = Read<int64_t>(input);
+    ArrayType<Type::kString> result;
+    result.reserve(size);
+    for (int64_t i = 0; i < size; ++i) {
+      result[i] = Read<std::string>(input);
+    }
+    return result;
+  }
+
+  template <>
+  ArrayType<Type::kInt64> ReadColumn(std::ifstream& input) {
+    int64_t size = Read<int64_t>(input);
+    ArrayType<Type::kInt64> result;
+    result.reserve(size);
+    for (int64_t i = 0; i < size; ++i) {
+      result[i] = Read<int64_t>(input);
+    }
+    return result;
   }
 
  private:
   mutable std::ifstream file_;
+  Metadata metadata_;
 };
 
 }  // namespace ngn

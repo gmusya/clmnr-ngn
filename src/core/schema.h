@@ -1,15 +1,13 @@
 #pragma once
 
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
 
-namespace ngn {
+#include "src/core/type.h"
 
-enum class Type {
-  kInt64,
-  kString,
-};
+namespace ngn {
 
 struct Field {
   std::string name;
@@ -40,6 +38,13 @@ class Schema {
       fields.emplace_back(DeserializeField(field));
     }
     return Schema(fields);
+  }
+
+  static Schema FromFile(const std::string& path) {
+    std::ifstream file(path);
+    std::stringstream ss;
+    ss << file.rdbuf();
+    return Deserialize(ss.str());
   }
 
  private:
