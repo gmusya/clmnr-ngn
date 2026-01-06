@@ -34,3 +34,7 @@ jobs:
         cd build
         ./src/core/ngn-csv-test
         ./src/execution/ngn-exec-test
+    - name: bench (dry-run)
+      run: |
+        cd build
+        ./src/execution/ngn-exec-bench --benchmark_dry_run
