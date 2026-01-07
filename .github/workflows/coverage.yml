@@ -21,6 +21,9 @@ jobs:
           clang-20 --version
           llvm-profdata-20 --version
           llvm-cov-20 --version
+
+          pip3 install conan
+          conan profile detect
       - name: build and run coverage
         run: |
           bash script/coverage.sh
