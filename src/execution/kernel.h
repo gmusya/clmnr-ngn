@@ -18,4 +18,9 @@ Column NotEqual(Column lhs, Column rhs);
 Column LessOrEqual(Column lhs, Column rhs);
 Column GreaterOrEqual(Column lhs, Column rhs);
 
+Value Max(const Column&);
+Value Min(const Column&);
+Value Count(const Column&);
+Value Sum(const Column&);
+
 }  // namespace ngn

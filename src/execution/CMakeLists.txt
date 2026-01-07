@@ -1,4 +1,5 @@
 add_library(ngn-exec STATIC
+  aggregation.cpp
   expression.cpp
   kernel.cpp
 )
