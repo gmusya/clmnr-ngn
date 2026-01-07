@@ -15,6 +15,7 @@ jobs:
       run: |
         sudo apt-get install clang-format clang-tidy
         pip3 install conan
+        conan profile detect
     - name: clang format
       run : |
         script/format.sh

@@ -23,6 +23,7 @@ jobs:
           llvm-cov-20 --version
 
           pip3 install conan
+          conan profile detect
       - name: build and run coverage
         run: |
           bash script/coverage.sh
