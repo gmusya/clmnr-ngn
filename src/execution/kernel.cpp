@@ -14,7 +14,6 @@ ArrayType<Type::kInt64> Add(const ArrayType<Type::kInt64>& lhs, const ArrayType<
   for (size_t i = 0; i < lhs.size(); ++i) {
     result[i] = lhs[i] + rhs[i];
   }
-
   return result;
 }
 
