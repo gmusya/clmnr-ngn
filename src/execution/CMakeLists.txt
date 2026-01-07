@@ -4,6 +4,7 @@ add_library(ngn-exec STATIC
 )
 
 target_include_directories(ngn-exec PUBLIC ${CMAKE_SOURCE_DIR})
+target_link_libraries(ngn-exec PUBLIC simde::simde)
 
 ################################################################################
 
@@ -13,7 +14,7 @@ add_executable(ngn-exec-test
   ut/kernel_test.cpp
 )
 
-target_link_libraries(ngn-exec-test PUBLIC ngn-exec gtest_main)
+target_link_libraries(ngn-exec-test PUBLIC ngn-exec GTest::gtest_main)
 
 ################################################################################
 

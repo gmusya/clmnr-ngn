@@ -14,24 +14,25 @@ jobs:
     - name: fetch dependencies
       run: |
         sudo apt-get install clang-format clang-tidy
+        pip3 install conan
     - name: clang format
       run : |
         script/format.sh
     - name: cmake
       run: |
-        mkdir build
-        cd build
-        cmake -GNinja -DCMAKE_BUILD_TYPE=Debug ..
+        conan profile detect
+        conan install . --output-folder=build --build=missing
+        cmake --preset conan-release
     - name: make
       run: |
-        cd build
-        ninja
+        cmake --build --preset conan-release
+        cp build/build/Release/compile_commands.json build/compile_commands.json
     - name: clang tidy
       run : |
         script/tidy.sh
     - name: test
       run: |
-        cd build
+        cd build/build/Release
         ./src/core/ngn-csv-test
         ./src/execution/ngn-exec-test
     - name: bench (dry-run)

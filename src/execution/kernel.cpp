@@ -1,7 +1,10 @@
 #include "src/execution/kernel.h"
 
+// #include "simd/vector_types.h"
 #include "src/util/assert.h"
 #include "src/util/macro.h"
+
+// #define NGN_SIMD
 
 namespace ngn {
 
@@ -11,9 +14,24 @@ ArrayType<Type::kInt64> Add(const ArrayType<Type::kInt64>& lhs, const ArrayType<
   ASSERT(lhs.size() == rhs.size());
 
   ArrayType<Type::kInt64> result(lhs.size());
-  for (size_t i = 0; i < lhs.size(); ++i) {
+
+  size_t i = 0;
+
+#ifdef NGN_SIMD
+  for (; i + 8 < lhs.size(); i += 8) {
+    const simd_long8* l = reinterpret_cast<const simd_long8*>(lhs.data());
+    const simd_long8* r = reinterpret_cast<const simd_long8*>(rhs.data());
+
+    simd_long8* res = reinterpret_cast<simd_long8*>(result.data());
+
+    *res = *l + *r;
+  }
+#endif
+
+  for (; i < lhs.size(); ++i) {
     result[i] = lhs[i] + rhs[i];
   }
+
   return result;
 }
 

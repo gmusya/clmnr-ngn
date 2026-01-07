@@ -10,4 +10,4 @@ add_executable(ngn-csv-test
   ut/schema_test.cpp
 )
 
-target_link_libraries(ngn-csv-test PUBLIC ngn-csv gtest_main)
+target_link_libraries(ngn-csv-test PUBLIC ngn-csv GTest::gtest_main)

@@ -1,25 +1,53 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# This script must be called from the root folder of the repository
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-mkdir -p build-coverage
+LLVM_VERSION="${LLVM_VERSION:-20}"
+OUTPUT_FOLDER="${OUTPUT_FOLDER:-${ROOT_DIR}/build-coverage}"
 
-cmake -S . -B build-coverage \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_C_COMPILER=/usr/bin/clang-20 \
-  -DCMAKE_CXX_COMPILER=/usr/bin/clang++-20 \
-  -DCMAKE_C_FLAGS="-O0 -g -fprofile-instr-generate -fcoverage-mapping" \
-  -DCMAKE_CXX_FLAGS="-O0 -g -fprofile-instr-generate -fcoverage-mapping" \
-  -DCMAKE_EXE_LINKER_FLAGS="-fprofile-instr-generate"
+if ! command -v "llvm-profdata-${LLVM_VERSION}" >/dev/null 2>&1; then
+  echo "ERROR: llvm-profdata-${LLVM_VERSION} not found in PATH." >&2
+  exit 127
+fi
+if ! command -v "llvm-cov-${LLVM_VERSION}" >/dev/null 2>&1; then
+  echo "ERROR: llvm-cov-${LLVM_VERSION} not found in PATH." >&2
+  exit 127
+fi
 
-cmake --build build-coverage -j $(nproc)
+export BUILD_TYPE=Debug
+export OUTPUT_FOLDER
+export COMPILER=clang
+export COMPILER_VERSION="${LLVM_VERSION}"
+export CPPSTD=23
+export WITH_COVERAGE=1
 
-LLVM_PROFILE_FILE="build-coverage/coverage.profraw" build-coverage/src/core/ngn-csv-test
+"${ROOT_DIR}/script/build.sh"
 
-llvm-profdata-20 merge -sparse build-coverage/coverage.profraw -o build-coverage/coverage.profdata
+CMAKE_BUILD_DIR="${OUTPUT_FOLDER}/build/Debug"
+TEST_BIN="${CMAKE_BUILD_DIR}/src/core/ngn-csv-test"
 
-llvm-cov-20 show \
-  build-coverage/src/core/ngn-csv-test \
-  -instr-profile=build-coverage/coverage.profdata \
-  -format=html -output-dir=build-coverage/coverage-html \
-  -ignore-filename-regex='(/_deps/|test)'
+if [[ ! -x "${TEST_BIN}" ]]; then
+  echo "Test binary not found/executable: ${TEST_BIN}" >&2
+  exit 2
+fi
+
+PROFRAW="${OUTPUT_FOLDER}/coverage.profraw"
+PROFDATA="${OUTPUT_FOLDER}/coverage.profdata"
+HTML_DIR="${OUTPUT_FOLDER}/coverage-html"
+
+rm -f "${PROFRAW}" "${PROFDATA}"
+rm -rf "${HTML_DIR}"
+mkdir -p "${HTML_DIR}"
+
+LLVM_PROFILE_FILE="${PROFRAW}" "${TEST_BIN}"
+
+"llvm-profdata-${LLVM_VERSION}" merge -sparse "${PROFRAW}" -o "${PROFDATA}"
+
+"llvm-cov-${LLVM_VERSION}" show \
+  "${TEST_BIN}" \
+  -instr-profile="${PROFDATA}" \
+  -format=html -output-dir="${HTML_DIR}" \
+  -ignore-filename-regex='(/_deps/|/build/|/test|/ut/)'
+
+echo "Coverage HTML: ${HTML_DIR}/index.html"
