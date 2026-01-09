@@ -69,8 +69,6 @@ int main(int argc, char** argv) {
   }
 
   for (auto row = reader.ReadNext(); row.has_value(); row = reader.ReadNext()) {
-    LOG(INFO) << "row size: " << row.value().size();
-    LOG(INFO) << "columns size: " << columns.size();
     ASSERT(row->size() == columns.size());
 
     for (size_t i = 0; i < row.value().size(); ++i) {
