@@ -40,6 +40,38 @@ TEST(CsvReader, Simple) {
   EXPECT_EQ(rows[5], (CsvReader::Row{"", "", "z"}));
 }
 
+TEST(CsvReader, QuotedAndEscaped) {
+  std::mt19937 rnd(2101);
+
+  std::filesystem::path path = std::filesystem::temp_directory_path() / std::to_string(rnd() % 10000);
+
+  std::ofstream file(path);
+  file << "\"a,b\",c" << std::endl;
+  file << "\"a\"\"b\",c" << std::endl;
+  file << "\"line\\nbreak\",x" << std::endl;
+  file << "\"tab\\tseparated\",x" << std::endl;
+  file << "\"quote\\\"here\",x" << std::endl;
+  file << "\"slash\\\\here\",x" << std::endl;
+  file << "a\\,b,c" << std::endl;
+  file.close();
+
+  CsvReader reader(path);
+
+  std::vector<CsvReader::Row> rows;
+  for (auto row = reader.ReadNext(); row.has_value(); row = reader.ReadNext()) {
+    rows.emplace_back(std::move(*row));
+  }
+
+  ASSERT_EQ(rows.size(), 7);
+  EXPECT_EQ(rows[0], (CsvReader::Row{"a,b", "c"}));
+  EXPECT_EQ(rows[1], (CsvReader::Row{"a\"b", "c"}));
+  EXPECT_EQ(rows[2], (CsvReader::Row{std::string("line\nbreak"), "x"}));
+  EXPECT_EQ(rows[3], (CsvReader::Row{std::string("tab\tseparated"), "x"}));
+  EXPECT_EQ(rows[4], (CsvReader::Row{"quote\"here", "x"}));
+  EXPECT_EQ(rows[5], (CsvReader::Row{"slash\\here", "x"}));
+  EXPECT_EQ(rows[6], (CsvReader::Row{"a,b", "c"}));
+}
+
 TEST(CsvWriter, Simple) {
   std::mt19937 rnd(2101);
 
