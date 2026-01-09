@@ -44,13 +44,13 @@ class Schema {
 
   void ToFile(const std::string& path) {
     std::ofstream file(path);
-    ASSERT(file.good());
+    ASSERT_WITH_MESSAGE(file.good(), "Failed to open schema file: " + path);
     file << Serialize();
   }
 
   static Schema FromFile(const std::string& path) {
     std::ifstream file(path);
-    ASSERT(file.good());
+    ASSERT_WITH_MESSAGE(file.good(), "Failed to open schema file: " + path);
     std::stringstream ss;
     ss << file.rdbuf();
     return Deserialize(ss.str());

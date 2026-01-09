@@ -61,6 +61,17 @@ struct Binary : public Expression {
   std::shared_ptr<Expression> rhs;
 };
 
+inline std::shared_ptr<Const> MakeConst(Value value) { return std::make_shared<Const>(std::move(value)); }
+
+inline std::shared_ptr<Variable> MakeVariable(std::string name, Type type) {
+  return std::make_shared<Variable>(std::move(name), std::move(type));
+}
+
+inline std::shared_ptr<Binary> MakeBinary(BinaryFunction function, std::shared_ptr<Expression> lhs,
+                                          std::shared_ptr<Expression> rhs) {
+  return std::make_shared<Binary>(std::move(function), std::move(lhs), std::move(rhs));
+}
+
 Column Evaluate(std::shared_ptr<Batch> batch, std::shared_ptr<Expression> expression);
 
 }  // namespace ngn

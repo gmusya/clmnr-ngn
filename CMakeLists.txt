@@ -7,3 +7,4 @@ include(cmake/dependencies.cmake)
 
 add_subdirectory(src)
 add_subdirectory(exe)
+add_subdirectory(clickbench)

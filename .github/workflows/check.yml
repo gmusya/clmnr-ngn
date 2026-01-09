@@ -41,3 +41,7 @@ jobs:
       run: |
         cd build/build/Release
         ./src/execution/ngn-exec-bench --benchmark_dry_run
+    - name: clickbench (sample-run)
+      run: |
+        cd build/build/Release
+        ./clickbench/ngn-clickbench-run --input=../../../example/hits_sample.clmnr --schema=../../../example/hits.schema
