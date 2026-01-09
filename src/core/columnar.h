@@ -101,12 +101,32 @@ class FileWriter {
     }
   }
 
+  void WriteColumn(const ArrayType<Type::kInt16>& values, std::ofstream& output) {
+    WriteColumnCommon<Type::kInt16>(values, output);
+  }
+
+  void WriteColumn(const ArrayType<Type::kInt32>& values, std::ofstream& output) {
+    WriteColumnCommon<Type::kInt32>(values, output);
+  }
+
   void WriteColumn(const ArrayType<Type::kInt64>& values, std::ofstream& output) {
     WriteColumnCommon<Type::kInt64>(values, output);
   }
 
   void WriteColumn(const ArrayType<Type::kString>& values, std::ofstream& output) {
     WriteColumnCommon<Type::kString>(values, output);
+  }
+
+  void WriteColumn(const ArrayType<Type::kDate>& values, std::ofstream& output) {
+    WriteColumnCommon<Type::kDate>(values, output);
+  }
+
+  void WriteColumn(const ArrayType<Type::kTimestamp>& values, std::ofstream& output) {
+    WriteColumnCommon<Type::kTimestamp>(values, output);
+  }
+
+  void WriteColumn(const ArrayType<Type::kChar>& values, std::ofstream& output) {
+    WriteColumnCommon<Type::kChar>(values, output);
   }
 
   std::string path_;

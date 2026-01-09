@@ -10,12 +10,22 @@ namespace {
 Column EvaluateConst(int64_t rows, std::shared_ptr<Const> expression) {
   return std::visit(
       [rows]<typename T>(const T& value) -> Column {
-        if constexpr (std::is_same_v<T, PhysicalType<Type::kInt64>>) {
+        if constexpr (std::is_same_v<T, PhysicalType<Type::kInt16>>) {
+          return Column(ArrayType<Type::kInt16>(rows, value));
+        } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt32>>) {
+          return Column(ArrayType<Type::kInt32>(rows, value));
+        } else if constexpr (std::is_same_v<T, PhysicalType<Type::kDate>>) {
+          return Column(ArrayType<Type::kDate>(rows, value));
+        } else if constexpr (std::is_same_v<T, PhysicalType<Type::kTimestamp>>) {
+          return Column(ArrayType<Type::kTimestamp>(rows, value));
+        } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt64>>) {
           return Column(ArrayType<Type::kInt64>(rows, value));
         } else if constexpr (std::is_same_v<T, PhysicalType<Type::kString>>) {
           return Column(ArrayType<Type::kString>(rows, value));
+        } else if constexpr (std::is_same_v<T, PhysicalType<Type::kChar>>) {
+          return Column(ArrayType<Type::kChar>(rows, value));
         } else {
-          static_assert(false);
+          static_assert(false, "Unknown type");
         }
       },
       expression->value.GetValue());

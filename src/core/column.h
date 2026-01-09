@@ -12,9 +12,16 @@ namespace ngn {
 
 class Column {
  public:
-  using GenericColumn = std::variant<ArrayType<Type::kInt64>, ArrayType<Type::kString>>;
+  using GenericColumn =
+      std::variant<ArrayType<Type::kInt16>, ArrayType<Type::kInt32>, ArrayType<Type::kInt64>, ArrayType<Type::kString>,
+                   ArrayType<Type::kDate>, ArrayType<Type::kTimestamp>, ArrayType<Type::kChar>>;
 
+  explicit Column(ArrayType<Type::kInt16> values) : values_(std::move(values)) {}
+  explicit Column(ArrayType<Type::kInt32> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kInt64> values) : values_(std::move(values)) {}
+  explicit Column(ArrayType<Type::kDate> values) : values_(std::move(values)) {}
+  explicit Column(ArrayType<Type::kTimestamp> values) : values_(std::move(values)) {}
+  explicit Column(ArrayType<Type::kChar> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kString> values) : values_(std::move(values)) {}
 
   GenericColumn& Values() { return values_; }

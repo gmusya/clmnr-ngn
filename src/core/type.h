@@ -7,8 +7,27 @@
 namespace ngn {
 
 enum class Type {
+  kInt16,
+  kInt32,
   kInt64,
+  kDate,
+  kTimestamp,
+  kChar,
   kString,
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+struct Date {
+  int64_t value;
+
+  bool operator==(const Date& other) const = default;
+};
+
+struct Timestamp {
+  int64_t value;
+
+  bool operator==(const Timestamp& other) const = default;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -18,6 +37,16 @@ template <Type type>
 struct PhysicalTypeTrait {};
 
 template <>
+struct PhysicalTypeTrait<Type::kInt16> {
+  using PhysicalType = int16_t;
+};
+
+template <>
+struct PhysicalTypeTrait<Type::kInt32> {
+  using PhysicalType = int32_t;
+};
+
+template <>
 struct PhysicalTypeTrait<Type::kInt64> {
   using PhysicalType = int64_t;
 };
@@ -25,6 +54,21 @@ struct PhysicalTypeTrait<Type::kInt64> {
 template <>
 struct PhysicalTypeTrait<Type::kString> {
   using PhysicalType = std::string;
+};
+
+template <>
+struct PhysicalTypeTrait<Type::kDate> {
+  using PhysicalType = Date;
+};
+
+template <>
+struct PhysicalTypeTrait<Type::kTimestamp> {
+  using PhysicalType = Timestamp;
+};
+
+template <>
+struct PhysicalTypeTrait<Type::kChar> {
+  using PhysicalType = char;
 };
 }  // namespace internal
 
