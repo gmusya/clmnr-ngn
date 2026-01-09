@@ -72,6 +72,30 @@ TEST(CsvReader, QuotedAndEscaped) {
   EXPECT_EQ(rows[6], (CsvReader::Row{"a,b", "c"}));
 }
 
+TEST(CsvReader, MultilineQuotedField) {
+  std::mt19937 rnd(2101);
+
+  std::filesystem::path path = std::filesystem::temp_directory_path() / std::to_string(rnd() % 10000);
+
+  std::ofstream file(path);
+  file << "a,\"b\nc\",d" << std::endl;
+  file << "x,y,z" << std::endl;
+  file.close();
+
+  CsvReader reader(path);
+
+  auto row1 = reader.ReadNext();
+  ASSERT_TRUE(row1.has_value());
+  EXPECT_EQ(*row1, (CsvReader::Row{"a", std::string("b\nc"), "d"}));
+
+  auto row2 = reader.ReadNext();
+  ASSERT_TRUE(row2.has_value());
+  EXPECT_EQ(*row2, (CsvReader::Row{"x", "y", "z"}));
+
+  auto row3 = reader.ReadNext();
+  EXPECT_FALSE(row3.has_value());
+}
+
 TEST(CsvWriter, Simple) {
   std::mt19937 rnd(2101);
 
