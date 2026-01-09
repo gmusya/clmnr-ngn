@@ -13,9 +13,11 @@ class ColumnarEngineConan(ConanFile):
 
     options = {
         "with_coverage": [True, False],
+        "with_profiling": [True, False],
     }
     default_options = {
         "with_coverage": False,
+        "with_profiling": False,
     }
 
     def requirements(self):
@@ -44,5 +46,9 @@ class ColumnarEngineConan(ConanFile):
                 tc.variables["CMAKE_C_FLAGS"] = flags
                 tc.variables["CMAKE_CXX_FLAGS"] = flags
                 tc.variables["CMAKE_EXE_LINKER_FLAGS"] = "-fprofile-instr-generate"
+
+        if self.options.with_profiling:
+            tc.variables["CMAKE_C_FLAGS_RELWITHDEBINFO"] = "-O2 -g -DNDEBUG -fno-omit-frame-pointer"
+            tc.variables["CMAKE_CXX_FLAGS_RELWITHDEBINFO"] = "-O2 -g -DNDEBUG -fno-omit-frame-pointer"
 
         tc.generate()

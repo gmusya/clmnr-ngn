@@ -21,6 +21,7 @@ CPPSTD="${CPPSTD:-23}"
 COMPILER="${COMPILER:-clang}"
 COMPILER_VERSION="${COMPILER_VERSION:-20}"
 WITH_COVERAGE="${WITH_COVERAGE:-0}"
+WITH_PROFILING="${WITH_PROFILING:-0}"
 
 if [[ "${COMPILER}" != "clang" && "${WITH_COVERAGE}" == "1" ]]; then
   echo "ERROR: Coverage mode is only supported with clang (set COMPILER=clang)." >&2
@@ -40,6 +41,10 @@ fi
 
 if [[ "${WITH_COVERAGE}" == "1" ]]; then
   CONAN_EXTRA_ARGS+=(-o with_coverage=True)
+fi
+
+if [[ "${WITH_PROFILING}" == "1" ]]; then
+  CONAN_EXTRA_ARGS+=(-o with_profiling=True)
 fi
 
 conan install "${ROOT_DIR}" \
@@ -78,5 +83,3 @@ if [[ -f "${CMAKE_BUILD_DIR}/compile_commands.json" ]]; then
 fi
 
 cmake --build "${CMAKE_BUILD_DIR}" -j "$(nproc)"
-
-
