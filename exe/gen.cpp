@@ -84,10 +84,7 @@ int main(int argc, char** argv) {
     LOG(INFO) << "print file to '" + path + "' <START>";
 
     ngn::FileWriter writer(path, schema);
-
-    for (auto& column : columns) {
-      writer.AppendColumn(column);
-    }
+    writer.AppendRowGroup(columns);
 
     std::move(writer).Finalize();
 

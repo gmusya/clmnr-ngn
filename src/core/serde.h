@@ -3,6 +3,8 @@
 #include <iostream>
 #include <string>
 
+#include "src/core/type.h"
+
 namespace ngn {
 
 template <typename T>
@@ -10,6 +12,34 @@ void Write(const T& value, std::ostream& out);
 
 template <typename T>
 T Read(std::istream& in);
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <>
+void Write(const int16_t& value, std::ostream& out) {
+  out.write(reinterpret_cast<const char*>(&value), sizeof(value));
+}
+
+template <>
+int16_t Read(std::istream& in) {
+  int16_t value;
+  in.read(reinterpret_cast<char*>(&value), sizeof(value));
+  return value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <>
+void Write(const int32_t& value, std::ostream& out) {
+  out.write(reinterpret_cast<const char*>(&value), sizeof(value));
+}
+
+template <>
+int32_t Read(std::istream& in) {
+  int32_t value;
+  in.read(reinterpret_cast<char*>(&value), sizeof(value));
+  return value;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -40,6 +70,44 @@ std::string Read(std::istream& in) {
   std::string value(sz, '0');
   in.read(value.data(), value.size());
 
+  return value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <>
+void Write(const Date& value, std::ostream& out) {
+  Write(value.value, out);
+}
+
+template <>
+Date Read(std::istream& in) {
+  return Date{Read<int64_t>(in)};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <>
+void Write(const Timestamp& value, std::ostream& out) {
+  Write(value.value, out);
+}
+
+template <>
+Timestamp Read(std::istream& in) {
+  return Timestamp{Read<int64_t>(in)};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <>
+void Write(const char& value, std::ostream& out) {
+  out.write(reinterpret_cast<const char*>(&value), sizeof(value));
+}
+
+template <>
+char Read(std::istream& in) {
+  char value;
+  in.read(reinterpret_cast<char*>(&value), sizeof(value));
   return value;
 }
 

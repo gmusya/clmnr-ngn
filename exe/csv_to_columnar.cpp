@@ -1,5 +1,6 @@
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
+#include "absl/log/log.h"
 #include "src/core/columnar.h"
 #include "src/core/csv.h"
 #include "src/core/schema.h"
@@ -9,6 +10,65 @@
 ABSL_FLAG(std::string, input, "", "Input CSV file");
 ABSL_FLAG(std::string, output, "", "Output columnar file");
 ABSL_FLAG(std::string, schema, "", "Schema file");
+
+ABSL_FLAG(int64_t, rows_per_log, std::numeric_limits<int64_t>::max(), "Rows to process for one log message");
+ABSL_FLAG(int64_t, row_group_size, 65536, "Rows per row group in output columnar file");
+
+namespace {
+std::vector<ngn::Column> MakeEmptyColumns(const ngn::Schema& schema, int64_t reserve) {
+  std::vector<ngn::Column> columns;
+  columns.reserve(schema.Fields().size());
+  for (const auto& field : schema.Fields()) {
+    switch (field.type) {
+      case ngn::Type::kInt16: {
+        ngn::ArrayType<ngn::Type::kInt16> arr;
+        arr.reserve(reserve);
+        columns.emplace_back(std::move(arr));
+        break;
+      }
+      case ngn::Type::kInt32: {
+        ngn::ArrayType<ngn::Type::kInt32> arr;
+        arr.reserve(reserve);
+        columns.emplace_back(std::move(arr));
+        break;
+      }
+      case ngn::Type::kInt64: {
+        ngn::ArrayType<ngn::Type::kInt64> arr;
+        arr.reserve(reserve);
+        columns.emplace_back(std::move(arr));
+        break;
+      }
+      case ngn::Type::kString: {
+        ngn::ArrayType<ngn::Type::kString> arr;
+        arr.reserve(reserve);
+        columns.emplace_back(std::move(arr));
+        break;
+      }
+      case ngn::Type::kDate: {
+        ngn::ArrayType<ngn::Type::kDate> arr;
+        arr.reserve(reserve);
+        columns.emplace_back(std::move(arr));
+        break;
+      }
+      case ngn::Type::kTimestamp: {
+        ngn::ArrayType<ngn::Type::kTimestamp> arr;
+        arr.reserve(reserve);
+        columns.emplace_back(std::move(arr));
+        break;
+      }
+      case ngn::Type::kChar: {
+        ngn::ArrayType<ngn::Type::kChar> arr;
+        arr.reserve(reserve);
+        columns.emplace_back(std::move(arr));
+        break;
+      }
+      default:
+        THROW_NOT_IMPLEMENTED;
+    }
+  }
+  return columns;
+}
+}  // namespace
 
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
@@ -38,21 +98,18 @@ int main(int argc, char** argv) {
   ngn::CsvReader reader(input);
   ngn::FileWriter writer(output, schema);
 
-  std::vector<ngn::Column> columns;
-  for (const auto& field : schema.Fields()) {
-    switch (field.type) {
-      case ngn::Type::kInt64:
-        columns.emplace_back(ngn::ArrayType<ngn::Type::kInt64>());
-        break;
-      case ngn::Type::kString:
-        columns.emplace_back(ngn::ArrayType<ngn::Type::kString>());
-        break;
-      default:
-        THROW_NOT_IMPLEMENTED;
-    }
-  }
+  const int64_t row_group_size = absl::GetFlag(FLAGS_row_group_size);
+  ASSERT(row_group_size > 0);
 
+  std::vector<ngn::Column> columns = MakeEmptyColumns(schema, row_group_size);
+  int64_t rows_in_group = 0;
+
+  int64_t rows_processed = 0;
   for (auto row = reader.ReadNext(); row.has_value(); row = reader.ReadNext()) {
+    ++rows_processed;
+    if (rows_processed % absl::GetFlag(FLAGS_rows_per_log) == 0) {
+      LOG(INFO) << "Processed " << rows_processed << " rows";
+    }
     ASSERT(row->size() == columns.size());
 
     for (size_t i = 0; i < row.value().size(); ++i) {
@@ -64,14 +121,38 @@ int main(int argc, char** argv) {
         case ngn::Type::kString:
           std::get<ngn::ArrayType<ngn::Type::kString>>(columns[i].Values()).emplace_back(row.value()[i]);
           break;
+        case ngn::Type::kDate:
+          // TODO(gmusya): parse date
+          std::get<ngn::ArrayType<ngn::Type::kDate>>(columns[i].Values()).emplace_back(ngn::Date{0});
+          break;
+        case ngn::Type::kTimestamp:
+          // TODO(gmusya): parse timestamp
+          std::get<ngn::ArrayType<ngn::Type::kTimestamp>>(columns[i].Values()).emplace_back(ngn::Timestamp{0});
+          break;
+        case ngn::Type::kChar:
+          std::get<ngn::ArrayType<ngn::Type::kChar>>(columns[i].Values()).emplace_back(row.value()[i][0]);
+          break;
+        case ngn::Type::kInt16:
+          std::get<ngn::ArrayType<ngn::Type::kInt16>>(columns[i].Values()).emplace_back(std::stoll(row.value()[i]));
+          break;
+        case ngn::Type::kInt32:
+          std::get<ngn::ArrayType<ngn::Type::kInt32>>(columns[i].Values()).emplace_back(std::stoll(row.value()[i]));
+          break;
         default:
           THROW_NOT_IMPLEMENTED;
       }
     }
+
+    ++rows_in_group;
+    if (rows_in_group >= row_group_size) {
+      writer.AppendRowGroup(std::move(columns));
+      columns = MakeEmptyColumns(schema, row_group_size);
+      rows_in_group = 0;
+    }
   }
 
-  for (auto& column : columns) {
-    writer.AppendColumn(std::move(column));
+  if (rows_in_group > 0) {
+    writer.AppendRowGroup(std::move(columns));
   }
 
   std::move(writer).Finalize();

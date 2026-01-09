@@ -7,6 +7,7 @@
 
 #include "src/core/type.h"
 #include "src/util/assert.h"
+#include "src/util/macro.h"
 
 namespace ngn {
 
@@ -59,7 +60,27 @@ class Schema {
   static constexpr char kDelimiter = ',';
 
   static std::string SerializeField(const Field& field) {
-    return field.name + kDelimiter + (field.type == Type::kInt64 ? "int64" : "string");
+    std::string type_as_string = [](Type type) {
+      switch (type) {
+        case Type::kInt16:
+          return "int16";
+        case Type::kInt32:
+          return "int32";
+        case Type::kInt64:
+          return "int64";
+        case Type::kString:
+          return "string";
+        case Type::kDate:
+          return "date";
+        case Type::kTimestamp:
+          return "timestamp";
+        case Type::kChar:
+          return "char";
+        default:
+          THROW_RUNTIME_ERROR("Unknown type: " + std::to_string(static_cast<int>(type)));
+      }
+    }(field.type);
+    return field.name + kDelimiter + type_as_string;
   }
 
   static Field DeserializeField(const std::string& serialized) {
@@ -68,7 +89,23 @@ class Schema {
     std::string type;
     std::getline(ss, name, kDelimiter);
     std::getline(ss, type, kDelimiter);
-    return Field{name, type == "int64" ? Type::kInt64 : Type::kString};
+    if (type == "int16") {
+      return Field{name, Type::kInt16};
+    } else if (type == "int32") {
+      return Field{name, Type::kInt32};
+    } else if (type == "int64") {
+      return Field{name, Type::kInt64};
+    } else if (type == "string") {
+      return Field{name, Type::kString};
+    } else if (type == "date") {
+      return Field{name, Type::kDate};
+    } else if (type == "timestamp") {
+      return Field{name, Type::kTimestamp};
+    } else if (type == "char") {
+      return Field{name, Type::kChar};
+    } else {
+      THROW_RUNTIME_ERROR("Unknown type: " + type);
+    }
   }
 
   std::vector<Field> fields_;

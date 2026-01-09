@@ -33,33 +33,35 @@ int main(int argc, char** argv) {
   ngn::FileReader reader(input);
   ngn::CsvWriter writer(output);
 
-  std::vector<ngn::Column> columns;
-
-  for (size_t i = 0; i < reader.ColumnCount(); ++i) {
-    columns.emplace_back(reader.ReadColumn(i));
-  }
-
-  if (columns.empty()) {
-    std::cerr << "No columns found" << std::endl;
+  const uint64_t row_group_count = reader.RowGroupCount();
+  if (row_group_count == 0) {
+    std::cerr << "No row groups found" << std::endl;
     return 1;
   }
 
-  for (size_t i = 0; i < columns.size(); ++i) {
-    if (columns[0].Size() != columns[i].Size()) {
-      std::cerr << "All columns must have the same size" << std::endl;
-      return 1;
+  for (uint64_t rg = 0; rg < row_group_count; ++rg) {
+    std::vector<ngn::Column> columns = reader.ReadRowGroup(rg);
+    if (columns.empty()) {
+      continue;
     }
-  }
 
-  size_t rows_count = columns[0].Size();
-
-  for (size_t i = 0; i < rows_count; ++i) {
-    ngn::CsvWriter::Row row;
-    for (size_t j = 0; j < columns.size(); ++j) {
-      ngn::Value value = columns[j][i];
-      row.emplace_back(value.ToString());
+    for (size_t i = 0; i < columns.size(); ++i) {
+      if (columns[0].Size() != columns[i].Size()) {
+        std::cerr << "All columns must have the same size" << std::endl;
+        return 1;
+      }
     }
-    writer.WriteRow(row);
+
+    const size_t rows_count = columns[0].Size();
+    for (size_t i = 0; i < rows_count; ++i) {
+      ngn::CsvWriter::Row row;
+      row.reserve(columns.size());
+      for (size_t j = 0; j < columns.size(); ++j) {
+        ngn::Value value = columns[j][i];
+        row.emplace_back(value.ToString());
+      }
+      writer.WriteRow(row);
+    }
   }
 
   return 0;
