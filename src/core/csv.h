@@ -23,7 +23,7 @@ class CsvReader {
   };
 
   CsvReader(const std::string& filename, Options options = Options{}) : file_(filename), options_(options) {
-    ASSERT(file_.good());
+    ASSERT_WITH_MESSAGE(file_.good(), "Failed to open csv file: " + filename);
   }
 
   using Row = std::vector<std::string>;
