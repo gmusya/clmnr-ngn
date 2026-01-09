@@ -25,8 +25,8 @@ struct Operator {
 };
 
 struct ScanOperator : public Operator {
-  ScanOperator(std::string input_path, Schema schema)
-      : Operator(OperatorType::kScan), input_path(std::move(input_path)), schema(std::move(schema)) {
+  ScanOperator(std::string i, Schema s)
+      : Operator(OperatorType::kScan), input_path(std::move(i)), schema(std::move(s)) {
     ASSERT(!input_path.empty());
     ASSERT(!schema.Fields().empty());
   }
@@ -36,8 +36,8 @@ struct ScanOperator : public Operator {
 };
 
 struct FilterOperator : public Operator {
-  FilterOperator(std::shared_ptr<Operator> child, std::shared_ptr<Expression> condition)
-      : Operator(OperatorType::kFilter), child(std::move(child)), condition(std::move(condition)) {
+  FilterOperator(std::shared_ptr<Operator> chi, std::shared_ptr<Expression> cond)
+      : Operator(OperatorType::kFilter), child(std::move(chi)), condition(std::move(cond)) {
     ASSERT(child != nullptr);
     ASSERT(condition != nullptr);
   }
@@ -47,8 +47,8 @@ struct FilterOperator : public Operator {
 };
 
 struct ProjectOperator : public Operator {
-  ProjectOperator(std::shared_ptr<Operator> child, std::vector<std::shared_ptr<Expression>> projections)
-      : Operator(OperatorType::kProject), child(std::move(child)), projections(std::move(projections)) {
+  ProjectOperator(std::shared_ptr<Operator> chi, std::vector<std::shared_ptr<Expression>> proj)
+      : Operator(OperatorType::kProject), child(std::move(chi)), projections(std::move(proj)) {
     ASSERT(child != nullptr);
     ASSERT(!projections.empty());
   }
@@ -58,12 +58,11 @@ struct ProjectOperator : public Operator {
 };
 
 struct AggregateOperator : public Operator {
-  AggregateOperator(std::shared_ptr<Operator> child, std::shared_ptr<Aggregation> aggregation)
-      : Operator(OperatorType::kAggregate), child(std::move(child)), aggregation(std::move(aggregation)) {
+  AggregateOperator(std::shared_ptr<Operator> chi, std::shared_ptr<Aggregation> aggr)
+      : Operator(OperatorType::kAggregate), child(std::move(chi)), aggregation(std::move(aggr)) {
     ASSERT(child != nullptr);
     ASSERT(aggregation != nullptr);
     ASSERT(!aggregation->aggregations.empty());
-    ASSERT(!aggregation->group_by_expressions.empty());
   }
 
   std::shared_ptr<Operator> child;
@@ -71,8 +70,8 @@ struct AggregateOperator : public Operator {
 };
 
 struct SortOperator : public Operator {
-  SortOperator(std::shared_ptr<Operator> child, std::vector<std::shared_ptr<Expression>> sort_keys)
-      : Operator(OperatorType::kSort), child(std::move(child)), sort_keys(std::move(sort_keys)) {
+  SortOperator(std::shared_ptr<Operator> chi, std::vector<std::shared_ptr<Expression>> sk)
+      : Operator(OperatorType::kSort), child(std::move(chi)), sort_keys(std::move(sk)) {
     ASSERT(child != nullptr);
     ASSERT(!sort_keys.empty());
   }
@@ -82,8 +81,8 @@ struct SortOperator : public Operator {
 };
 
 struct LimitOperator : public Operator {
-  LimitOperator(std::shared_ptr<Operator> child, int64_t limit)
-      : Operator(OperatorType::kLimit), child(std::move(child)), limit(limit) {
+  LimitOperator(std::shared_ptr<Operator> chi, int64_t lim)
+      : Operator(OperatorType::kLimit), child(std::move(chi)), limit(lim) {
     ASSERT(child != nullptr);
     ASSERT(limit > 0);
   }
