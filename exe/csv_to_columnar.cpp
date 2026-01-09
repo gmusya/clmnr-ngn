@@ -11,6 +11,8 @@ ABSL_FLAG(std::string, input, "", "Input CSV file");
 ABSL_FLAG(std::string, output, "", "Output columnar file");
 ABSL_FLAG(std::string, schema, "", "Schema file");
 
+ABSL_FLAG(int64_t, rows_per_log, std::numeric_limits<int64_t>::max(), "Rows to process for one log message");
+
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
 
@@ -68,7 +70,12 @@ int main(int argc, char** argv) {
     }
   }
 
+  int64_t rows_processed = 0;
   for (auto row = reader.ReadNext(); row.has_value(); row = reader.ReadNext()) {
+    ++rows_processed;
+    if (rows_processed % absl::GetFlag(FLAGS_rows_per_log) == 0) {
+      LOG(INFO) << "Processed " << rows_processed << " rows";
+    }
     ASSERT(row->size() == columns.size());
 
     for (size_t i = 0; i < row.value().size(); ++i) {
