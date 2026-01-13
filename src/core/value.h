@@ -20,6 +20,8 @@ class Value {
   explicit Value(PhysicalType<Type::kTimestamp> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kChar> value) : value_(std::move(value)) {}
 
+  bool operator==(const Value& other) const = default;
+
   GenericValue& GetValue() { return value_; }
   const GenericValue& GetValue() const { return value_; }
 
