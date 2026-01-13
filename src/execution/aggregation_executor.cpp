@@ -62,6 +62,30 @@ class CountState : public IState {
 
 std::shared_ptr<IState> MakeCountState() { return std::make_shared<CountState>(); }
 
+class SumState : public IState {
+ public:
+  SumState() : sum_(static_cast<int64_t>(0)) {}
+
+  void Update(const Value& value) override {
+    if (auto ptr = std::get_if<int64_t>(&value.GetValue()); ptr != nullptr) {
+      sum_ += *ptr;
+    } else if (auto ptr = std::get_if<int16_t>(&value.GetValue()); ptr != nullptr) {
+      sum_ += *ptr;
+    } else if (auto ptr = std::get_if<int32_t>(&value.GetValue()); ptr != nullptr) {
+      sum_ += *ptr;
+    } else {
+      THROW_NOT_IMPLEMENTED;
+    }
+  }
+
+  Value Finalize() override { return Value(sum_); }
+
+ private:
+  int64_t sum_;
+};
+
+std::shared_ptr<IState> MakeSumState() { return std::make_shared<SumState>(); }
+
 class Aggregator {
  public:
   explicit Aggregator(Aggregation aggregation) : aggregation_(std::move(aggregation)) {
@@ -92,6 +116,8 @@ class Aggregator {
         for (size_t j = 0; j < value_columns.size(); ++j) {
           if (aggregation_.aggregations[j].type == AggregationType::kCount) {
             state.emplace_back(MakeCountState());
+          } else if (aggregation_.aggregations[j].type == AggregationType::kSum) {
+            state.emplace_back(MakeSumState());
           } else {
             THROW_NOT_IMPLEMENTED;
           }
@@ -152,7 +178,7 @@ class Aggregator {
 
  private:
   Type GetAggregationType(AggregationType type) {
-    if (type == AggregationType::kCount) {
+    if (type == AggregationType::kCount || type == AggregationType::kSum) {
       return Type::kInt64;
     } else {
       THROW_NOT_IMPLEMENTED;
