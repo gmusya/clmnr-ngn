@@ -12,10 +12,11 @@ namespace ngn {
 
 class Column {
  public:
-  using GenericColumn =
-      std::variant<ArrayType<Type::kInt16>, ArrayType<Type::kInt32>, ArrayType<Type::kInt64>, ArrayType<Type::kString>,
-                   ArrayType<Type::kDate>, ArrayType<Type::kTimestamp>, ArrayType<Type::kChar>>;
+  using GenericColumn = std::variant<ArrayType<Type::kBool>, ArrayType<Type::kInt16>, ArrayType<Type::kInt32>,
+                                     ArrayType<Type::kInt64>, ArrayType<Type::kString>, ArrayType<Type::kDate>,
+                                     ArrayType<Type::kTimestamp>, ArrayType<Type::kChar>>;
 
+  explicit Column(ArrayType<Type::kBool> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kInt16> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kInt32> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kInt64> values) : values_(std::move(values)) {}
@@ -28,7 +29,7 @@ class Column {
   const GenericColumn& Values() const { return values_; }
 
   Value operator[](size_t index) const {
-    return std::visit([index]<Type type>(const ArrayType<type>& arr) { return Value(arr[index]); }, values_);
+    return std::visit([index]<Type type>(const ArrayType<type>& arr) { return Value(arr.at(index)); }, values_);
   }
 
   Type GetType() const {

@@ -16,6 +16,20 @@ T Read(std::istream& in);
 ////////////////////////////////////////////////////////////////////////////////
 
 template <>
+void Write(const Boolean& value, std::ostream& out) {
+  out.write(reinterpret_cast<const char*>(&value.value), sizeof(value.value));
+}
+
+template <>
+Boolean Read(std::istream& in) {
+  Boolean value;
+  in.read(reinterpret_cast<char*>(&value.value), sizeof(value.value));
+  return value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <>
 void Write(const int16_t& value, std::ostream& out) {
   out.write(reinterpret_cast<const char*>(&value), sizeof(value));
 }

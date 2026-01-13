@@ -8,10 +8,11 @@ namespace ngn {
 
 class Value {
  public:
-  using GenericValue = std::variant<PhysicalType<Type::kInt16>, PhysicalType<Type::kInt32>, PhysicalType<Type::kInt64>,
-                                    PhysicalType<Type::kString>, PhysicalType<Type::kDate>,
+  using GenericValue = std::variant<PhysicalType<Type::kBool>, PhysicalType<Type::kInt16>, PhysicalType<Type::kInt32>,
+                                    PhysicalType<Type::kInt64>, PhysicalType<Type::kString>, PhysicalType<Type::kDate>,
                                     PhysicalType<Type::kTimestamp>, PhysicalType<Type::kChar>>;
 
+  explicit Value(PhysicalType<Type::kBool> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kInt16> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kInt32> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kInt64> value) : value_(std::move(value)) {}
@@ -28,7 +29,9 @@ class Value {
   std::string ToString() const {
     return std::visit(
         []<typename T>(const T& value) -> std::string {
-          if constexpr (std::is_same_v<T, PhysicalType<Type::kInt16>>) {
+          if constexpr (std::is_same_v<T, PhysicalType<Type::kBool>>) {
+            return std::to_string(value.value);
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt16>>) {
             return std::to_string(value);
           } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt32>>) {
             return std::to_string(value);

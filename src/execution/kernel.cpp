@@ -47,6 +47,16 @@ ArrayType<Type::kInt64> Div(const ArrayType<Type::kInt64>& lhs, const ArrayType<
   return result;
 }
 
+ArrayType<Type::kBool> NotEqual(const ArrayType<Type::kInt16>& lhs, const ArrayType<Type::kInt16>& rhs) {
+  ASSERT(lhs.size() == rhs.size());
+
+  ArrayType<Type::kBool> result(lhs.size());
+  for (size_t i = 0; i < lhs.size(); ++i) {
+    result[i] = Boolean{lhs[i] != rhs[i]};
+  }
+  return result;
+}
+
 }  // namespace internal
 
 Column Add(const Column& lhs, const Column& rhs) {
@@ -81,13 +91,19 @@ Column Div(const Column& lhs, const Column& rhs) {
       internal::Div(std::get<ArrayType<Type::kInt64>>(lhs.Values()), std::get<ArrayType<Type::kInt64>>(rhs.Values())));
 }
 
-Column And(Column, Column) { THROW_NOT_IMPLEMENTED; }
-Column Or(Column, Column) { THROW_NOT_IMPLEMENTED; }
-Column Less(Column, Column) { THROW_NOT_IMPLEMENTED; }
-Column Greater(Column, Column) { THROW_NOT_IMPLEMENTED; }
-Column Equal(Column, Column) { THROW_NOT_IMPLEMENTED; }
-Column NotEqual(Column, Column) { THROW_NOT_IMPLEMENTED; }
-Column LessOrEqual(Column, Column) { THROW_NOT_IMPLEMENTED; }
-Column GreaterOrEqual(Column, Column) { THROW_NOT_IMPLEMENTED; }
+Column And(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
+Column Or(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
+Column Less(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
+Column Greater(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
+Column Equal(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
+Column NotEqual(const Column& lhs, const Column& rhs) {
+  ASSERT(lhs.GetType() == Type::kInt16);
+  ASSERT(rhs.GetType() == Type::kInt16);
+
+  return Column(internal::NotEqual(std::get<ArrayType<Type::kInt16>>(lhs.Values()),
+                                   std::get<ArrayType<Type::kInt16>>(rhs.Values())));
+}
+Column LessOrEqual(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
+Column GreaterOrEqual(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
 
 }  // namespace ngn
