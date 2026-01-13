@@ -56,8 +56,8 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeAggregate(
         MakeScan(input_, schema_),
-        MakeAggregation(
-            {Aggregation::AggregationInfo{AggregationType::kCount, MakeVariable("*", Type::kInt64), "count"}}, {}));
+        MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
+                        {}));
 
     return QueryInfo{.plan = plan, .name = "Q0"};
   }
@@ -69,8 +69,8 @@ class QueryMaker {
         MakeFilter(
             MakeScan(input_, schema_),
             MakeBinary(BinaryFunction::kNotEqual, MakeVariable("AdvEngineID", Type::kInt64), MakeConst(Value(0)))),
-        MakeAggregation(
-            {Aggregation::AggregationInfo{AggregationType::kCount, MakeVariable("*", Type::kInt64), "count"}}, {}));
+        MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
+                        {}));
 
     return QueryInfo{.plan = plan, .name = "Q1"};
   }

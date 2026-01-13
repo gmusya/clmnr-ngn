@@ -62,6 +62,10 @@ std::shared_ptr<IState> MakeCountState() { return std::make_shared<CountState>()
 
 class Aggregator {
  public:
+  explicit Aggregator(Aggregation aggregation) : aggregation_(std::move(aggregation)) {
+    ASSERT(!aggregation_.aggregations.empty());
+  }
+
   void Consume(std::shared_ptr<Batch> batch) {
     std::vector<Column> group_by_columns;
     for (const auto& expr : aggregation_.group_by_expressions) {
@@ -84,7 +88,11 @@ class Aggregator {
         std::vector<std::shared_ptr<IState>> state;
         state.reserve(value_columns.size());
         for (size_t j = 0; j < value_columns.size(); ++j) {
-          state.emplace_back(MakeCountState());
+          if (aggregation_.aggregations[j].type == AggregationType::kCount) {
+            state.emplace_back(MakeCountState());
+          } else {
+            THROW_NOT_IMPLEMENTED;
+          }
         }
         state_[group_by] = std::move(state);
         it = state_.find(group_by);
@@ -104,8 +112,16 @@ class Aggregator {
     std::vector<Field> fields;
     fields.reserve(aggregation_.aggregations.size());
     for (const auto& aggr : aggregation_.aggregations) {
-      fields.emplace_back(Field(aggr.name, Type::kInt64));
-      columns.emplace_back(Column(ArrayType<Type::kInt64>{}));
+      Type type = GetAggregationType(aggr.type);
+      fields.emplace_back(Field(aggr.name, type));
+
+      switch (type) {
+        case Type::kInt64:
+          columns.emplace_back(Column(ArrayType<Type::kInt64>{}));
+          break;
+        default:
+          THROW_NOT_IMPLEMENTED;
+      }
     }
 
     for (const auto& [group_by, state] : state_) {
@@ -130,18 +146,29 @@ class Aggregator {
   }
 
  private:
+  Type GetAggregationType(AggregationType type) {
+    if (type == AggregationType::kCount) {
+      return Type::kInt64;
+    } else {
+      THROW_NOT_IMPLEMENTED;
+    }
+  }
+
   std::unordered_map<std::vector<Value>, std::vector<std::shared_ptr<IState>>, VectorValueHash> state_;
   Aggregation aggregation_;
 };
 
 }  // namespace
 
-std::shared_ptr<Batch> Evaluate(std::shared_ptr<IStream<std::shared_ptr<Batch>>> batch,
+std::shared_ptr<Batch> Evaluate(std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream,
                                 std::shared_ptr<Aggregation> aggregation) {
-  ASSERT(batch != nullptr);
-  ASSERT(aggregation != nullptr);
+  Aggregator aggregator(*aggregation);
 
-  return batch->Next().value();
+  while (const auto& batch = stream->Next()) {
+    aggregator.Consume(batch.value());
+  }
+
+  return std::make_shared<Batch>(aggregator.Finalize());
 }
 
 }  // namespace ngn
