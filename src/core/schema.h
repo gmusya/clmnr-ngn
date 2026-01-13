@@ -22,6 +22,9 @@ class Schema {
  public:
   explicit Schema(std::vector<Field> fields) : fields_(std::move(fields)) {}
 
+  bool operator==(const Schema& other) const = default;
+  bool operator!=(const Schema& other) const = default;
+
   const std::vector<Field>& Fields() const { return fields_; }
 
   std::string Serialize() const {

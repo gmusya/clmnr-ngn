@@ -5,6 +5,7 @@
 #include "src/execution/aggregation.h"
 #include "src/execution/batch.h"
 #include "src/execution/expression.h"
+#include "src/execution/stream.h"
 
 namespace ngn {
 
@@ -119,6 +120,6 @@ inline std::shared_ptr<LimitOperator> MakeLimit(std::shared_ptr<Operator> child,
   return std::make_shared<LimitOperator>(std::move(child), std::move(limit));
 }
 
-Batch Execute(std::shared_ptr<Operator> op);
+std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operator> op);
 
 }  // namespace ngn

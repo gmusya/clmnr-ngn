@@ -19,29 +19,6 @@ ABSL_FLAG(std::string, output_dir, "", "Output directory for CSV results. Files 
 
 namespace ngn {
 
-static void WriteBatchCsv(const Batch& batch, const std::string& output_path) {
-  CsvWriter writer(output_path);
-
-  const auto& fields = batch.GetSchema().Fields();
-  const auto& cols = batch.Columns();
-
-  CsvWriter::Row header;
-  header.reserve(fields.size());
-  for (const auto& f : fields) {
-    header.emplace_back(f.name);
-  }
-  writer.WriteRow(header);
-
-  for (int64_t r = 0; r < batch.Rows(); ++r) {
-    CsvWriter::Row row;
-    row.reserve(cols.size());
-    for (const auto& col : cols) {
-      row.emplace_back(col[r].ToString());
-    }
-    writer.WriteRow(row);
-  }
-}
-
 struct QueryInfo {
   std::shared_ptr<ngn::Operator> plan;
   std::string name;
@@ -116,10 +93,18 @@ int main(int argc, char** argv) {
     auto& q = queries[i];
     LOG(INFO) << "Running " << q.name;
     try {
-      ngn::Batch result = ngn::Execute(q.plan);
       const std::filesystem::path out_path = std::filesystem::path(output_dir) / ("q" + std::to_string(i) + ".csv");
-      ngn::WriteBatchCsv(result, out_path.string());
-      LOG(INFO) << "Wrote " << out_path.string();
+      ngn::CsvWriter writer(out_path.string());
+      auto stream = ngn::Execute(q.plan);
+      while (const auto& batch = stream->Next()) {
+        for (int64_t r = 0; r < batch.value()->Rows(); ++r) {
+          ngn::CsvWriter::Row row;
+          for (const auto& col : batch.value()->Columns()) {
+            row.emplace_back(col[r].ToString());
+          }
+          writer.WriteRow(row);
+        }
+      }
     } catch (const std::exception& e) {
       LOG(ERROR) << q.name << " failed: " << e.what();
     }
