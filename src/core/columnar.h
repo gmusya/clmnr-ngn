@@ -232,6 +232,12 @@ class FileReader {
       const auto& field = metadata_.GetSchema().Fields()[col_idx];
       file_.seekg(offset + column_offsets[col_idx], std::ios::beg);
       switch (field.type) {
+        case Type::kBool: {
+          auto col = internal::ReadColumn<Type::kBool>(file_);
+          ASSERT(static_cast<int64_t>(col.size()) == row_count);
+          result.emplace_back(std::move(col));
+          break;
+        }
         case Type::kInt16: {
           auto col = internal::ReadColumn<Type::kInt16>(file_);
           ASSERT(static_cast<int64_t>(col.size()) == row_count);
@@ -303,6 +309,11 @@ class FileReader {
     file_.seekg(offset + column_offsets[column_idx], std::ios::beg);
 
     switch (col_type) {
+      case Type::kBool: {
+        auto col = internal::ReadColumn<Type::kBool>(file_);
+        ASSERT(static_cast<int64_t>(col.size()) == row_count);
+        return Column(std::move(col));
+      }
       case Type::kInt16: {
         auto col = internal::ReadColumn<Type::kInt16>(file_);
         ASSERT(static_cast<int64_t>(col.size()) == row_count);

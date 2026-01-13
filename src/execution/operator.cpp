@@ -56,6 +56,60 @@ class ScanStream : public IStream<std::shared_ptr<Batch>> {
   size_t row_group_index_ = 0;
 };
 
+class FilterStream : public IStream<std::shared_ptr<Batch>> {
+ public:
+  FilterStream(std::shared_ptr<FilterOperator> filter) : op_(std::move(filter)) { stream_ = Execute(op_->child); }
+
+  std::optional<std::shared_ptr<Batch>> Next() override {
+    std::optional<std::shared_ptr<Batch>> batch = stream_->Next();
+    if (batch) {
+      Column condition_result = Evaluate(batch.value(), op_->condition);
+      ASSERT(condition_result.GetType() == Type::kBool);
+
+      return ApplyFilterColumn(batch.value(), std::get<ArrayType<Type::kBool>>(condition_result.Values()));
+    }
+    return std::nullopt;
+  }
+
+ private:
+  std::shared_ptr<Batch> ApplyFilterColumn(std::shared_ptr<Batch> batch, ArrayType<Type::kBool> filter) {
+    ASSERT(batch->Rows() == static_cast<int64_t>(filter.size()));
+
+    std::vector<Column> filtered_columns;
+
+    filtered_columns.reserve(batch->Columns().size());
+    for (const auto& column : batch->Columns()) {
+      std::visit([&filtered_columns]<typename T>(const T&) -> void { filtered_columns.emplace_back(T{}); },
+                 column.Values());
+    }
+
+    for (int64_t i = 0; i < batch->Rows(); ++i) {
+      if (filter[i].value) {
+        for (size_t j = 0; j < batch->Columns().size(); ++j) {
+          Column::GenericColumn& column = filtered_columns.at(j).Values();
+          Value::GenericValue value = batch->Columns().at(j)[i].GetValue();
+
+          std::visit(
+              [&value]<Type type>(ArrayType<type>& column) -> void {
+                if (std::holds_alternative<PhysicalType<type>>(value)) {
+                  column.emplace_back(std::get<PhysicalType<type>>(value));
+                } else {
+                  THROW_RUNTIME_ERROR("Type mismatch, type = " + std::to_string(static_cast<int>(type)) +
+                                      ", vs index " + std::to_string(value.index()));
+                }
+              },
+              column);
+        }
+      }
+    }
+
+    return std::make_shared<Batch>(std::move(filtered_columns), batch->GetSchema());
+  }
+
+  std::shared_ptr<FilterOperator> op_;
+  std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
+};
+
 std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operator> op) {
   ASSERT(op != nullptr);
 
@@ -65,7 +119,7 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
     case OperatorType::kScan:
       return std::make_shared<ScanStream>(std::static_pointer_cast<ScanOperator>(op));
     case OperatorType::kFilter:
-      THROW_NOT_IMPLEMENTED;
+      return std::make_shared<FilterStream>(std::static_pointer_cast<FilterOperator>(op));
     case OperatorType::kProject:
       THROW_NOT_IMPLEMENTED;
     case OperatorType::kSort:

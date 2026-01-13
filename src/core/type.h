@@ -7,6 +7,7 @@
 namespace ngn {
 
 enum class Type {
+  kBool,
   kInt16,
   kInt32,
   kInt64,
@@ -30,11 +31,22 @@ struct Timestamp {
   bool operator==(const Timestamp& other) const = default;
 };
 
+struct Boolean {
+  bool value;
+
+  bool operator==(const Boolean& other) const = default;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace internal {
 template <Type type>
 struct PhysicalTypeTrait {};
+
+template <>
+struct PhysicalTypeTrait<Type::kBool> {
+  using PhysicalType = Boolean;
+};
 
 template <>
 struct PhysicalTypeTrait<Type::kInt16> {

@@ -22,6 +22,8 @@ struct ValueHash {
             return std::hash<int64_t>{}(val.value);
           } else if constexpr (std::is_same_v<T, Timestamp>) {
             return std::hash<int64_t>{}(val.value);
+          } else if constexpr (std::is_same_v<T, Boolean>) {
+            return std::hash<bool>{}(val.value);
           } else {
             return std::hash<T>{}(val);
           }
@@ -131,15 +133,18 @@ class Aggregator {
         values.emplace_back(s->Finalize());
       }
       for (size_t i = 0; i < values.size(); ++i) {
+        Column& column = columns[i];
+        Value::GenericValue value = values[i].GetValue();
+
         std::visit(
-            [&values, i]<Type type>(ArrayType<type>& column) -> void {
-              if (std::holds_alternative<PhysicalType<type>>(values[i].GetValue())) {
-                column.emplace_back(std::get<PhysicalType<type>>(values[i].GetValue()));
+            [value]<Type type>(ArrayType<type>& column) -> void {
+              if (std::holds_alternative<PhysicalType<type>>(value)) {
+                column.emplace_back(std::get<PhysicalType<type>>(value));
               } else {
                 THROW_RUNTIME_ERROR("Type mismatch");
               }
             },
-            columns[i].Values());
+            column.Values());
       }
     }
     return Batch(std::move(columns), Schema(fields));

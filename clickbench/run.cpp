@@ -43,9 +43,9 @@ class QueryMaker {
     // SELECT COUNT(*) FROM hits WHERE AdvEngineID <> 0;
 
     std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeFilter(
-            MakeScan(input_, schema_),
-            MakeBinary(BinaryFunction::kNotEqual, MakeVariable("AdvEngineID", Type::kInt64), MakeConst(Value(0)))),
+        MakeFilter(MakeScan(input_, schema_),
+                   MakeBinary(BinaryFunction::kNotEqual, MakeVariable("AdvEngineID", Type::kInt16),
+                              MakeConst(Value(static_cast<int16_t>(0))))),
         MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
                         {}));
 

@@ -65,6 +65,8 @@ class Schema {
   static std::string SerializeField(const Field& field) {
     std::string type_as_string = [](Type type) {
       switch (type) {
+        case Type::kBool:
+          return "bool";
         case Type::kInt16:
           return "int16";
         case Type::kInt32:
@@ -92,7 +94,9 @@ class Schema {
     std::string type;
     std::getline(ss, name, kDelimiter);
     std::getline(ss, type, kDelimiter);
-    if (type == "int16") {
+    if (type == "bool") {
+      return Field{name, Type::kBool};
+    } else if (type == "int16") {
       return Field{name, Type::kInt16};
     } else if (type == "int32") {
       return Field{name, Type::kInt32};

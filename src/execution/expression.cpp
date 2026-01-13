@@ -10,7 +10,9 @@ namespace {
 Column EvaluateConst(int64_t rows, std::shared_ptr<Const> expression) {
   return std::visit(
       [rows]<typename T>(const T& value) -> Column {
-        if constexpr (std::is_same_v<T, PhysicalType<Type::kInt16>>) {
+        if constexpr (std::is_same_v<T, PhysicalType<Type::kBool>>) {
+          return Column(ArrayType<Type::kBool>(rows, value));
+        } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt16>>) {
           return Column(ArrayType<Type::kInt16>(rows, value));
         } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt32>>) {
           return Column(ArrayType<Type::kInt32>(rows, value));
