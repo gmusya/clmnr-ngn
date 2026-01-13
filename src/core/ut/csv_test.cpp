@@ -126,4 +126,29 @@ TEST(CsvWriter, Simple) {
   EXPECT_EQ(lines[5], ",,z");
 }
 
+TEST(CsvWriter, QuotedAndEscaped) {
+  std::mt19937 rnd(2101);
+
+  std::filesystem::path path = std::filesystem::temp_directory_path() / std::to_string(rnd() % 10000);
+
+  CsvWriter writer(path);
+  writer.WriteRow({"a,b", "c"});
+  writer.WriteRow({"a\"b", "c"});
+  writer.WriteRow({"a\\,b", "c"});
+  writer.WriteRow({"a\\\"b", "c"});
+
+  std::ifstream file(path);
+
+  std::vector<std::string> lines;
+  std::string line;
+  while (std::getline(file, line)) {
+    lines.emplace_back(line);
+  }
+
+  ASSERT_EQ(lines.size(), 4);
+  EXPECT_EQ(lines[0], "\"a,b\",c");
+  EXPECT_EQ(lines[1], "\"a\"\"b\",c");
+  EXPECT_EQ(lines[2], "\"a\\,b\",c");
+  EXPECT_EQ(lines[3], "\"a\\\"\"b\",c");
+}
 }  // namespace ngn

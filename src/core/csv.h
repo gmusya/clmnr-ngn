@@ -171,6 +171,9 @@ class CsvWriter {
  public:
   struct Options {
     char delimiter = ',';
+    char quote = '"';
+
+    bool double_quote_escape = true;
 
     Options() {}
   };
@@ -185,13 +188,40 @@ class CsvWriter {
       if (!is_first) {
         file_ << options_.delimiter;
       }
-      file_ << value;
+      file_ << Escape(value);
       is_first = false;
     }
     file_ << std::endl;
   }
 
  private:
+  std::string Escape(const std::string& s) const {
+    bool needs_quotes = false;
+    for (char ch : s) {
+      if (ch == options_.delimiter || ch == options_.quote || ch == '\n' || ch == '\r') {
+        needs_quotes = true;
+        break;
+      }
+    }
+    if (!needs_quotes) {
+      return s;
+    }
+
+    std::string out;
+    out.reserve(s.size() + 2);
+    out.push_back(options_.quote);
+    for (char ch : s) {
+      if (ch == options_.quote && options_.double_quote_escape) {
+        out.push_back(options_.quote);
+        out.push_back(options_.quote);
+      } else {
+        out.push_back(ch);
+      }
+    }
+    out.push_back(options_.quote);
+    return out;
+  }
+
   std::ofstream file_;
   Options options_{};
 };
