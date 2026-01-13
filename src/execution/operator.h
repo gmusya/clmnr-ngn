@@ -47,15 +47,20 @@ struct FilterOperator : public Operator {
   std::shared_ptr<Expression> condition;
 };
 
+struct ProjectionUnit {
+  std::shared_ptr<Expression> expression;
+  std::string name;
+};
+
 struct ProjectOperator : public Operator {
-  ProjectOperator(std::shared_ptr<Operator> chi, std::vector<std::shared_ptr<Expression>> proj)
+  ProjectOperator(std::shared_ptr<Operator> chi, std::vector<ProjectionUnit> proj)
       : Operator(OperatorType::kProject), child(std::move(chi)), projections(std::move(proj)) {
     ASSERT(child != nullptr);
     ASSERT(!projections.empty());
   }
 
   std::shared_ptr<Operator> child;
-  std::vector<std::shared_ptr<Expression>> projections;
+  std::vector<ProjectionUnit> projections;
 };
 
 struct AggregateOperator : public Operator {
@@ -102,7 +107,7 @@ inline std::shared_ptr<FilterOperator> MakeFilter(std::shared_ptr<Operator> chil
 }
 
 inline std::shared_ptr<ProjectOperator> MakeProject(std::shared_ptr<Operator> child,
-                                                    std::vector<std::shared_ptr<Expression>> projections) {
+                                                    std::vector<ProjectionUnit> projections) {
   return std::make_shared<ProjectOperator>(std::move(child), std::move(projections));
 }
 

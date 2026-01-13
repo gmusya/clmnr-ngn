@@ -11,6 +11,7 @@
 #include "absl/log/log.h"
 #include "src/core/csv.h"
 #include "src/execution/aggregation.h"
+#include "src/execution/expression.h"
 #include "src/execution/operator.h"
 
 ABSL_FLAG(std::string, input, "", "Input columnar file (.clmnr)");
@@ -52,6 +53,26 @@ class QueryMaker {
     return QueryInfo{.plan = plan, .name = "Q1"};
   }
 
+  QueryInfo MakeQ2() {
+    // SELECT SUM(AdvEngineID), COUNT(*), AVG(ResolutionWidth) FROM hits;
+
+    std::shared_ptr<Operator> plan = MakeProject(
+        MakeAggregate(
+            MakeScan(input_, schema_),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kSum, MakeVariable("AdvEngineID", Type::kInt16), "sum"},
+                 AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"},
+                 AggregationUnit{AggregationType::kSum, MakeVariable("ResolutionWidth", Type::kInt16), "total"}},
+                {})),
+        {ProjectionUnit{MakeVariable("sum", Type::kInt64), "sum"},
+         ProjectionUnit{MakeVariable("count", Type::kInt64), "count"},
+         ProjectionUnit{
+             MakeBinary(BinaryFunction::kDiv, MakeVariable("total", Type::kInt64), MakeVariable("count", Type::kInt64)),
+             "total"}});
+
+    return QueryInfo{.plan = plan, .name = "Q2"};
+  }
+
  private:
   std::string input_;
   ngn::Schema schema_;
@@ -87,6 +108,7 @@ int main(int argc, char** argv) {
   std::vector<ngn::QueryInfo> queries = {
       query_maker.MakeQ0(),
       query_maker.MakeQ1(),
+      query_maker.MakeQ2(),
   };
 
   for (size_t i = 0; i < queries.size(); ++i) {

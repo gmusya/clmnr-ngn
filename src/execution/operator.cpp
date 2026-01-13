@@ -110,6 +110,32 @@ class FilterStream : public IStream<std::shared_ptr<Batch>> {
   std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
 };
 
+class ProjectStream : public IStream<std::shared_ptr<Batch>> {
+ public:
+  ProjectStream(std::shared_ptr<ProjectOperator> project) : op_(std::move(project)) { stream_ = Execute(op_->child); }
+
+  std::optional<std::shared_ptr<Batch>> Next() override {
+    std::optional<std::shared_ptr<Batch>> batch = stream_->Next();
+    if (batch) {
+      std::vector<Column> projected_columns;
+      projected_columns.reserve(op_->projections.size());
+
+      std::vector<Field> fields;
+      for (const auto& projection : op_->projections) {
+        projected_columns.emplace_back(Evaluate(batch.value(), projection.expression));
+
+        fields.emplace_back(Field(projection.name, projected_columns.back().GetType()));
+      }
+      return std::make_shared<Batch>(std::move(projected_columns), Schema(fields));
+    }
+    return std::nullopt;
+  }
+
+ private:
+  std::shared_ptr<ProjectOperator> op_;
+  std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
+};
+
 std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operator> op) {
   ASSERT(op != nullptr);
 
@@ -121,7 +147,7 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
     case OperatorType::kFilter:
       return std::make_shared<FilterStream>(std::static_pointer_cast<FilterOperator>(op));
     case OperatorType::kProject:
-      THROW_NOT_IMPLEMENTED;
+      return std::make_shared<ProjectStream>(std::static_pointer_cast<ProjectOperator>(op));
     case OperatorType::kSort:
       THROW_NOT_IMPLEMENTED;
     case OperatorType::kLimit:
