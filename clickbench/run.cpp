@@ -1,17 +1,21 @@
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
+#include "src/core/csv.h"
 #include "src/execution/aggregation.h"
 #include "src/execution/operator.h"
 
 ABSL_FLAG(std::string, input, "", "Input columnar file (.clmnr)");
 ABSL_FLAG(std::string, schema, "", "Schema file (.schema)");
+ABSL_FLAG(std::string, output_dir, "", "Output directory for CSV results. Files will be named q{i}.csv");
 
 namespace ngn {
 
@@ -29,8 +33,8 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeAggregate(
         MakeScan(input_, schema_),
-        MakeAggregation(
-            {Aggregation::AggregationInfo{AggregationType::kCount, MakeVariable("*", Type::kInt64), "count"}}, {}));
+        MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
+                        {}));
 
     return QueryInfo{.plan = plan, .name = "Q0"};
   }
@@ -42,8 +46,8 @@ class QueryMaker {
         MakeFilter(
             MakeScan(input_, schema_),
             MakeBinary(BinaryFunction::kNotEqual, MakeVariable("AdvEngineID", Type::kInt64), MakeConst(Value(0)))),
-        MakeAggregation(
-            {Aggregation::AggregationInfo{AggregationType::kCount, MakeVariable("*", Type::kInt64), "count"}}, {}));
+        MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
+                        {}));
 
     return QueryInfo{.plan = plan, .name = "Q1"};
   }
@@ -71,6 +75,13 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  const std::string output_dir = absl::GetFlag(FLAGS_output_dir);
+  if (output_dir.empty()) {
+    std::cerr << "--output_dir is required\n";
+    return 1;
+  }
+  std::filesystem::create_directories(output_dir);
+
   ngn::QueryMaker query_maker(input, ngn::Schema::FromFile(schema));
 
   std::vector<ngn::QueryInfo> queries = {
@@ -78,11 +89,22 @@ int main(int argc, char** argv) {
       query_maker.MakeQ1(),
   };
 
-  for (auto& q : queries) {
+  for (size_t i = 0; i < queries.size(); ++i) {
+    auto& q = queries[i];
     LOG(INFO) << "Running " << q.name;
     try {
-      ngn::Execute(q.plan);
-      std::cout.flush();
+      const std::filesystem::path out_path = std::filesystem::path(output_dir) / ("q" + std::to_string(i) + ".csv");
+      ngn::CsvWriter writer(out_path.string());
+      auto stream = ngn::Execute(q.plan);
+      while (const auto& batch = stream->Next()) {
+        for (int64_t r = 0; r < batch.value()->Rows(); ++r) {
+          ngn::CsvWriter::Row row;
+          for (const auto& col : batch.value()->Columns()) {
+            row.emplace_back(col[r].ToString());
+          }
+          writer.WriteRow(row);
+        }
+      }
     } catch (const std::exception& e) {
       LOG(ERROR) << q.name << " failed: " << e.what();
     }

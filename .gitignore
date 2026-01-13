@@ -4,5 +4,6 @@
 build
 build-coverage
 build-profile
+output
 
 CMakeUserPresets.json

@@ -44,4 +44,4 @@ jobs:
     - name: clickbench (sample-run)
       run: |
         cd build/build/Release
-        ./clickbench/ngn-clickbench-run --input=../../../example/hits_sample.clmnr --schema=../../../example/hits.schema
+        ./clickbench/ngn-clickbench-run --input=../../../example/hits_sample.clmnr --schema=../../../example/hits.schema --output_dir=output

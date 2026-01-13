@@ -20,7 +20,10 @@ class Batch {
 
   int64_t Rows() const { return columns_[0].Size(); }
 
-  Column ColumnByName(const std::string& name) {
+  const Schema& GetSchema() const { return schema_; }
+  const std::vector<Column>& Columns() const { return columns_; }
+
+  Column ColumnByName(const std::string& name) const {
     const auto& fields = schema_.Fields();
     auto iter = std::find_if(fields.begin(), fields.end(), [&name](const Field& field) { return field.name == name; });
     ASSERT(iter != fields.end());

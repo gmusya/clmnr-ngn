@@ -172,7 +172,6 @@ class CsvWriter {
   struct Options {
     char delimiter = ',';
     char quote = '"';
-
     bool double_quote_escape = true;
 
     Options() {}

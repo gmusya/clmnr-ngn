@@ -1,6 +1,7 @@
 add_library(ngn-exec STATIC
   expression.cpp
   kernel.cpp
+  aggregation_executor.cpp
   operator.cpp
 )
 
@@ -10,6 +11,7 @@ target_link_libraries(ngn-exec PUBLIC simde::simde)
 ################################################################################
 
 add_executable(ngn-exec-test
+  ut/aggregation_test.cpp
   ut/batch_test.cpp
   ut/expression_test.cpp
   ut/kernel_test.cpp
