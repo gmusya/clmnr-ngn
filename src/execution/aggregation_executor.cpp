@@ -236,28 +236,7 @@ class Aggregator {
     }
 
     for (const auto& field : fields) {
-      switch (field.type) {
-        case Type::kInt16:
-          columns.emplace_back(Column(ArrayType<Type::kInt16>{}));
-          break;
-        case Type::kInt32:
-          columns.emplace_back(Column(ArrayType<Type::kInt32>{}));
-          break;
-        case Type::kInt64:
-          columns.emplace_back(Column(ArrayType<Type::kInt64>{}));
-          break;
-        case Type::kInt128:
-          columns.emplace_back(Column(ArrayType<Type::kInt128>{}));
-          break;
-        case Type::kDate:
-          columns.emplace_back(Column(ArrayType<Type::kDate>{}));
-          break;
-        case Type::kString:
-          columns.emplace_back(Column(ArrayType<Type::kString>{}));
-          break;
-        default:
-          THROW_RUNTIME_ERROR("Unimplemented for type " + std::to_string(static_cast<int>(field.type)));
-      }
+      Dispatch([&]<Type type>(Tag<type>) { columns.emplace_back(Column(ArrayType<type>{})); }, field.type);
     }
 
     for (const auto& [group_by, state] : state_) {

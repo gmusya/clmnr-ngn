@@ -231,64 +231,13 @@ class FileReader {
     for (uint64_t col_idx = 0; col_idx < ColumnCount(); ++col_idx) {
       const auto& field = metadata_.GetSchema().Fields()[col_idx];
       file_.seekg(offset + column_offsets[col_idx], std::ios::beg);
-      switch (field.type) {
-        case Type::kBool: {
-          auto col = internal::ReadColumn<Type::kBool>(file_);
-          ASSERT(static_cast<int64_t>(col.size()) == row_count);
-          result.emplace_back(std::move(col));
-          break;
-        }
-        case Type::kInt16: {
-          auto col = internal::ReadColumn<Type::kInt16>(file_);
-          ASSERT(static_cast<int64_t>(col.size()) == row_count);
-          result.emplace_back(std::move(col));
-          break;
-        }
-        case Type::kInt32: {
-          auto col = internal::ReadColumn<Type::kInt32>(file_);
-          ASSERT(static_cast<int64_t>(col.size()) == row_count);
-          result.emplace_back(std::move(col));
-          break;
-        }
-        case Type::kInt64: {
-          auto col = internal::ReadColumn<Type::kInt64>(file_);
-          ASSERT(static_cast<int64_t>(col.size()) == row_count);
-          result.emplace_back(std::move(col));
-          break;
-        }
-        case Type::kInt128: {
-          auto col = internal::ReadColumn<Type::kInt128>(file_);
-          ASSERT(static_cast<int64_t>(col.size()) == row_count);
-          result.emplace_back(std::move(col));
-          break;
-        }
-        case Type::kString: {
-          auto col = internal::ReadColumn<Type::kString>(file_);
-          ASSERT(static_cast<int64_t>(col.size()) == row_count);
-          result.emplace_back(std::move(col));
-          break;
-        }
-        case Type::kDate: {
-          auto col = internal::ReadColumn<Type::kDate>(file_);
-          ASSERT(static_cast<int64_t>(col.size()) == row_count);
-          result.emplace_back(std::move(col));
-          break;
-        }
-        case Type::kTimestamp: {
-          auto col = internal::ReadColumn<Type::kTimestamp>(file_);
-          ASSERT(static_cast<int64_t>(col.size()) == row_count);
-          result.emplace_back(std::move(col));
-          break;
-        }
-        case Type::kChar: {
-          auto col = internal::ReadColumn<Type::kChar>(file_);
-          ASSERT(static_cast<int64_t>(col.size()) == row_count);
-          result.emplace_back(std::move(col));
-          break;
-        }
-        default:
-          THROW_NOT_IMPLEMENTED;
-      }
+      Dispatch(
+          [&]<Type type>(Tag<type>) {
+            auto col = internal::ReadColumn<type>(file_);
+            ASSERT(static_cast<int64_t>(col.size()) == row_count);
+            result.emplace_back(std::move(col));
+          },
+          field.type);
     }
 
     return result;
@@ -314,55 +263,13 @@ class FileReader {
     const Type col_type = metadata_.GetSchema().Fields()[column_idx].type;
     file_.seekg(offset + column_offsets[column_idx], std::ios::beg);
 
-    switch (col_type) {
-      case Type::kBool: {
-        auto col = internal::ReadColumn<Type::kBool>(file_);
-        ASSERT(static_cast<int64_t>(col.size()) == row_count);
-        return Column(std::move(col));
-      }
-      case Type::kInt16: {
-        auto col = internal::ReadColumn<Type::kInt16>(file_);
-        ASSERT(static_cast<int64_t>(col.size()) == row_count);
-        return Column(std::move(col));
-      }
-      case Type::kInt32: {
-        auto col = internal::ReadColumn<Type::kInt32>(file_);
-        ASSERT(static_cast<int64_t>(col.size()) == row_count);
-        return Column(std::move(col));
-      }
-      case Type::kInt64: {
-        auto col = internal::ReadColumn<Type::kInt64>(file_);
-        ASSERT(static_cast<int64_t>(col.size()) == row_count);
-        return Column(std::move(col));
-      }
-      case Type::kInt128: {
-        auto col = internal::ReadColumn<Type::kInt128>(file_);
-        ASSERT(static_cast<int64_t>(col.size()) == row_count);
-        return Column(std::move(col));
-      }
-      case Type::kString: {
-        auto col = internal::ReadColumn<Type::kString>(file_);
-        ASSERT(static_cast<int64_t>(col.size()) == row_count);
-        return Column(std::move(col));
-      }
-      case Type::kDate: {
-        auto col = internal::ReadColumn<Type::kDate>(file_);
-        ASSERT(static_cast<int64_t>(col.size()) == row_count);
-        return Column(std::move(col));
-      }
-      case Type::kTimestamp: {
-        auto col = internal::ReadColumn<Type::kTimestamp>(file_);
-        ASSERT(static_cast<int64_t>(col.size()) == row_count);
-        return Column(std::move(col));
-      }
-      case Type::kChar: {
-        auto col = internal::ReadColumn<Type::kChar>(file_);
-        ASSERT(static_cast<int64_t>(col.size()) == row_count);
-        return Column(std::move(col));
-      }
-      default:
-        THROW_NOT_IMPLEMENTED;
-    }
+    return Dispatch(
+        [&]<Type type>(Tag<type>) {
+          auto col = internal::ReadColumn<type>(file_);
+          ASSERT(static_cast<int64_t>(col.size()) == row_count);
+          return Column(std::move(col));
+        },
+        col_type);
   }
 
  private:
