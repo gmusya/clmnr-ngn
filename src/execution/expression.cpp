@@ -22,6 +22,8 @@ Column EvaluateConst(int64_t rows, std::shared_ptr<Const> expression) {
           return Column(ArrayType<Type::kTimestamp>(rows, value));
         } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt64>>) {
           return Column(ArrayType<Type::kInt64>(rows, value));
+        } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt128>>) {
+          return Column(ArrayType<Type::kInt128>(rows, value));
         } else if constexpr (std::is_same_v<T, PhysicalType<Type::kString>>) {
           return Column(ArrayType<Type::kString>(rows, value));
         } else if constexpr (std::is_same_v<T, PhysicalType<Type::kChar>>) {

@@ -4,6 +4,7 @@
 
 #include "src/core/column.h"
 #include "src/core/schema.h"
+#include "src/util/assert.h"
 
 namespace ngn {
 
@@ -26,8 +27,7 @@ class Batch {
   Column ColumnByName(const std::string& name) const {
     const auto& fields = schema_.Fields();
     auto iter = std::find_if(fields.begin(), fields.end(), [&name](const Field& field) { return field.name == name; });
-    ASSERT(iter != fields.end());
-
+    ASSERT_WITH_MESSAGE(iter != fields.end(), "Column '" + name + "' is not found in batch");
     size_t index = iter - fields.begin();
     return columns_[index];
   }

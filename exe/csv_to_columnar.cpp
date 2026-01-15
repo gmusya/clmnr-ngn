@@ -38,6 +38,12 @@ std::vector<ngn::Column> MakeEmptyColumns(const ngn::Schema& schema, int64_t res
         columns.emplace_back(std::move(arr));
         break;
       }
+      case ngn::Type::kInt128: {
+        ngn::ArrayType<ngn::Type::kInt128> arr;
+        arr.reserve(reserve);
+        columns.emplace_back(std::move(arr));
+        break;
+      }
       case ngn::Type::kString: {
         ngn::ArrayType<ngn::Type::kString> arr;
         arr.reserve(reserve);
@@ -117,6 +123,10 @@ int main(int argc, char** argv) {
       switch (field.type) {
         case ngn::Type::kInt64:
           std::get<ngn::ArrayType<ngn::Type::kInt64>>(columns[i].Values()).emplace_back(std::stoll(row.value()[i]));
+          break;
+        case ngn::Type::kInt128:
+          std::get<ngn::ArrayType<ngn::Type::kInt128>>(columns[i].Values())
+              .emplace_back(ngn::ParseInt128(row.value()[i]));
           break;
         case ngn::Type::kString:
           std::get<ngn::ArrayType<ngn::Type::kString>>(columns[i].Values()).emplace_back(row.value()[i]);

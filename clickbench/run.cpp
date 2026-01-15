@@ -73,6 +73,23 @@ class QueryMaker {
     return QueryInfo{.plan = plan, .name = "Q2"};
   }
 
+  QueryInfo MakeQ3() {
+    // SELECT AVG(UserID) FROM hits;
+
+    std::shared_ptr<Operator> plan = MakeProject(
+        MakeAggregate(
+            MakeScan(input_, schema_),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kSum, MakeVariable("UserID", Type::kInt64), "sum"},
+                 AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
+                {})),
+        {ProjectionUnit{
+            MakeBinary(BinaryFunction::kDiv, MakeVariable("sum", Type::kInt128), MakeVariable("count", Type::kInt64)),
+            "total"}});
+
+    return QueryInfo{.plan = plan, .name = "Q3"};
+  }
+
  private:
   std::string input_;
   ngn::Schema schema_;
@@ -109,6 +126,7 @@ int main(int argc, char** argv) {
       query_maker.MakeQ0(),
       query_maker.MakeQ1(),
       query_maker.MakeQ2(),
+      query_maker.MakeQ3(),
   };
 
   for (size_t i = 0; i < queries.size(); ++i) {
