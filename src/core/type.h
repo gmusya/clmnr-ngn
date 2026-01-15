@@ -25,19 +25,19 @@ enum class Type {
 struct Date {
   int64_t value;
 
-  bool operator==(const Date& other) const = default;
+  auto operator<=>(const Date& other) const = default;
 };
 
 struct Timestamp {
   int64_t value;
 
-  bool operator==(const Timestamp& other) const = default;
+  auto operator<=>(const Timestamp& other) const = default;
 };
 
 struct Boolean {
   bool value;
 
-  bool operator==(const Boolean& other) const = default;
+  auto operator<=>(const Boolean& other) const = default;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

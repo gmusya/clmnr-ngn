@@ -113,6 +113,18 @@ class QueryMaker {
     return QueryInfo{.plan = plan, .name = "Q5"};
   }
 
+  QueryInfo MakeQ6() {
+    // SELECT MIN(EventDate), MAX(EventDate) FROM hits;
+
+    std::shared_ptr<Operator> plan = MakeAggregate(
+        MakeScan(input_, schema_),
+        MakeAggregation({AggregationUnit{AggregationType::kMin, MakeVariable("EventDate", Type::kDate), "min"},
+                         AggregationUnit{AggregationType::kMax, MakeVariable("EventDate", Type::kDate), "max"}},
+                        {}));
+
+    return QueryInfo{.plan = plan, .name = "Q6"};
+  }
+
  private:
   std::string input_;
   ngn::Schema schema_;
@@ -146,7 +158,8 @@ int main(int argc, char** argv) {
   ngn::QueryMaker query_maker(input, ngn::Schema::FromFile(schema));
 
   std::vector<ngn::QueryInfo> queries = {query_maker.MakeQ0(), query_maker.MakeQ1(), query_maker.MakeQ2(),
-                                         query_maker.MakeQ3(), query_maker.MakeQ4(), query_maker.MakeQ5()};
+                                         query_maker.MakeQ3(), query_maker.MakeQ4(), query_maker.MakeQ5(),
+                                         query_maker.MakeQ6()};
 
   for (size_t i = 0; i < queries.size(); ++i) {
     auto& q = queries[i];

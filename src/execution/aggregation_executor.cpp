@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "src/core/type.h"
 #include "src/core/value.h"
 #include "src/execution/aggregation.h"
 #include "src/execution/expression.h"
@@ -111,6 +112,46 @@ class SumState : public IState {
 
 std::shared_ptr<IState> MakeSumState(Type output_type) { return std::make_shared<SumState>(output_type); }
 
+template <bool is_min>
+class MinMaxState : public IState {
+ public:
+  explicit MinMaxState([[maybe_unused]] Type output_type) {}
+
+  void Update(const Value& value) override {
+    if (result_value_.has_value()) {
+      if (auto ptr = std::get_if<PhysicalType<Type::kDate>>(&value.GetValue()); ptr != nullptr) {
+        const auto& current_value = std::get<PhysicalType<Type::kDate>>(result_value_->GetValue());
+        if constexpr (is_min) {
+          if (*ptr < current_value) {
+            result_value_ = Value(*ptr);
+          }
+        } else {
+          if (*ptr > current_value) {
+            result_value_ = Value(*ptr);
+          }
+        }
+      } else {
+        THROW_NOT_IMPLEMENTED;
+      }
+    } else {
+      result_value_ = value;
+    }
+  }
+
+  Value Finalize() override {
+    ASSERT(result_value_.has_value());
+
+    return *result_value_;
+  }
+
+ private:
+  std::optional<Value> result_value_;
+};
+
+std::shared_ptr<IState> MakeMinState(Type output_type) { return std::make_shared<MinMaxState<true>>(output_type); }
+
+std::shared_ptr<IState> MakeMaxState(Type output_type) { return std::make_shared<MinMaxState<false>>(output_type); }
+
 class DistinctState : public IState {
  public:
   explicit DistinctState() {}
@@ -159,6 +200,10 @@ class Aggregator {
             state.emplace_back(MakeSumState(GetAggregationType(aggregation_.aggregations[j])));
           } else if (aggregation_.aggregations[j].type == AggregationType::kDistinct) {
             state.emplace_back(MakeDistinctState());
+          } else if (aggregation_.aggregations[j].type == AggregationType::kMin) {
+            state.emplace_back(MakeMinState(GetAggregationType(aggregation_.aggregations[j])));
+          } else if (aggregation_.aggregations[j].type == AggregationType::kMax) {
+            state.emplace_back(MakeMaxState(GetAggregationType(aggregation_.aggregations[j])));
           } else {
             THROW_NOT_IMPLEMENTED;
           }
@@ -190,6 +235,9 @@ class Aggregator {
           break;
         case Type::kInt128:
           columns.emplace_back(Column(ArrayType<Type::kInt128>{}));
+          break;
+        case Type::kDate:
+          columns.emplace_back(Column(ArrayType<Type::kDate>{}));
           break;
         default:
           THROW_NOT_IMPLEMENTED;
@@ -275,6 +323,9 @@ class Aggregator {
     }
     if (unit.type == AggregationType::kSum) {
       return GetSumOutputType(GetExpressionType(unit.expression));
+    }
+    if (unit.type == AggregationType::kMin || unit.type == AggregationType::kMax) {
+      return GetExpressionType(unit.expression);
     }
     THROW_NOT_IMPLEMENTED;
   }
