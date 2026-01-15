@@ -5,7 +5,6 @@
 #include <optional>
 #include <unordered_map>
 #include <vector>
-#include <iostream>
 
 #include "src/core/value.h"
 #include "src/execution/expression.h"
@@ -94,7 +93,6 @@ class SumState : public IState {
 
   Value Finalize() override {
     if (output_type_ == Type::kInt128) {
-      std::cerr << Int128ToString(sum_) << std::endl;
       return Value(sum_);
     }
     if (sum_ > static_cast<Int128>(std::numeric_limits<int64_t>::max()) ||
