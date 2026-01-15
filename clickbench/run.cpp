@@ -244,6 +244,64 @@ class QueryMaker {
     return QueryInfo{.plan = plan, .name = "Q13"};
   }
 
+  QueryInfo MakeQ14() {
+    // SELECT SearchEngineID, SearchPhrase, COUNT(*) AS c FROM hits WHERE SearchPhrase <> '' GROUP BY SearchEngineID,
+    // SearchPhrase ORDER BY c DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, schema_),
+                       MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
+                                  MakeConst(Value(std::string(""))))),
+            MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
+                            {GroupByUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
+                             GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
+        {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q14"};
+  }
+
+  QueryInfo MakeQ15() {
+    // SELECT UserID, COUNT(*) FROM hits GROUP BY UserID ORDER BY COUNT(*) DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeScan(input_, schema_),
+            MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
+                            {GroupByUnit{MakeVariable("UserID", Type::kInt64), "UserID"}})),
+        {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q15"};
+  }
+
+  QueryInfo MakeQ16() {
+    // SELECT UserID, SearchPhrase, COUNT(*) FROM hits GROUP BY UserID, SearchPhrase ORDER BY COUNT(*) DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeScan(input_, schema_),
+            MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
+                            {GroupByUnit{MakeVariable("UserID", Type::kInt64), "UserID"},
+                             GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
+        {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q16"};
+  }
+
+  QueryInfo MakeQ17() {
+    // SELECT UserID, SearchPhrase, COUNT(*) FROM hits GROUP BY UserID, SearchPhrase LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeScan(input_, schema_),
+            MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
+                            {GroupByUnit{MakeVariable("UserID", Type::kInt64), "UserID"},
+                             GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
+        {SortUnit{MakeVariable("UserID", Type::kInt64), true}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q17"};
+  }
+
  private:
   std::string input_;
   ngn::Schema schema_;
@@ -277,9 +335,10 @@ int main(int argc, char** argv) {
   ngn::QueryMaker query_maker(input, ngn::Schema::FromFile(schema));
 
   std::vector<ngn::QueryInfo> queries = {
-      query_maker.MakeQ0(),  query_maker.MakeQ1(),  query_maker.MakeQ2(),  query_maker.MakeQ3(), query_maker.MakeQ4(),
-      query_maker.MakeQ5(),  query_maker.MakeQ6(),  query_maker.MakeQ7(),  query_maker.MakeQ8(), query_maker.MakeQ9(),
-      query_maker.MakeQ10(), query_maker.MakeQ11(), query_maker.MakeQ12(), query_maker.MakeQ13()};
+      query_maker.MakeQ0(),  query_maker.MakeQ1(),  query_maker.MakeQ2(),  query_maker.MakeQ3(),  query_maker.MakeQ4(),
+      query_maker.MakeQ5(),  query_maker.MakeQ6(),  query_maker.MakeQ7(),  query_maker.MakeQ8(),  query_maker.MakeQ9(),
+      query_maker.MakeQ10(), query_maker.MakeQ11(), query_maker.MakeQ12(), query_maker.MakeQ13(), query_maker.MakeQ14(),
+      query_maker.MakeQ15(), query_maker.MakeQ16(), query_maker.MakeQ17()};
 
   for (size_t i = 0; i < queries.size(); ++i) {
     auto& q = queries[i];
