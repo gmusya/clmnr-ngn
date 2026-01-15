@@ -153,6 +153,97 @@ class QueryMaker {
     return QueryInfo{.plan = plan, .name = "Q8"};
   }
 
+  QueryInfo MakeQ9() {
+    // SELECT RegionID, SUM(AdvEngineID), COUNT(*) AS c, AVG(ResolutionWidth), COUNT(DISTINCT UserID) FROM hits GROUP BY
+    // RegionID ORDER BY c DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeProject(
+        MakeTopK(
+            MakeAggregate(
+                MakeScan(input_, schema_),
+                MakeAggregation(
+                    {AggregationUnit{AggregationType::kSum, MakeVariable("AdvEngineID", Type::kInt16), "sum_adv"},
+                     AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"},
+                     AggregationUnit{AggregationType::kSum, MakeVariable("ResolutionWidth", Type::kInt16), "sum_res"},
+                     AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "distinct_u"}},
+                    {GroupByUnit{MakeVariable("RegionID", Type::kInt32), "RegionID"}})),
+            {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10),
+        {ProjectionUnit{MakeVariable("RegionID", Type::kInt32), "RegionID"},
+         ProjectionUnit{MakeVariable("sum_adv", Type::kInt64), "sum_adv"},
+         ProjectionUnit{MakeVariable("c", Type::kInt64), "c"},
+         ProjectionUnit{
+             MakeBinary(BinaryFunction::kDiv, MakeVariable("sum_res", Type::kInt64), MakeVariable("c", Type::kInt64)),
+             "avg_res"},
+         ProjectionUnit{MakeVariable("distinct_u", Type::kInt64), "distinct_u"}});
+
+    return QueryInfo{.plan = plan, .name = "Q9"};
+  }
+
+  QueryInfo MakeQ10() {
+    // SELECT MobilePhoneModel, COUNT(DISTINCT UserID) AS u FROM hits WHERE MobilePhoneModel <> '' GROUP BY
+    // MobilePhoneModel ORDER BY u DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, schema_),
+                       MakeBinary(BinaryFunction::kNotEqual, MakeVariable("MobilePhoneModel", Type::kString),
+                                  MakeConst(Value(std::string(""))))),
+            MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "u"}},
+                            {GroupByUnit{MakeVariable("MobilePhoneModel", Type::kString), "MobilePhoneModel"}})),
+        {SortUnit{MakeVariable("u", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q10"};
+  }
+
+  QueryInfo MakeQ11() {
+    // SELECT MobilePhone, MobilePhoneModel, COUNT(DISTINCT UserID) AS u FROM hits WHERE MobilePhoneModel <> '' GROUP BY
+    // MobilePhone, MobilePhoneModel ORDER BY u DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, schema_),
+                       MakeBinary(BinaryFunction::kNotEqual, MakeVariable("MobilePhoneModel", Type::kString),
+                                  MakeConst(Value(std::string(""))))),
+            MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "u"}},
+                            {GroupByUnit{MakeVariable("MobilePhone", Type::kInt16), "MobilePhone"},
+                             GroupByUnit{MakeVariable("MobilePhoneModel", Type::kString), "MobilePhoneModel"}})),
+        {SortUnit{MakeVariable("u", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q11"};
+  }
+
+  QueryInfo MakeQ12() {
+    // SELECT SearchPhrase, COUNT(*) AS c FROM hits WHERE SearchPhrase <> '' GROUP BY SearchPhrase ORDER BY c DESC LIMIT
+    // 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, schema_),
+                       MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
+                                  MakeConst(Value(std::string(""))))),
+            MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
+                            {GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
+        {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q12"};
+  }
+
+  QueryInfo MakeQ13() {
+    // SELECT SearchPhrase, COUNT(DISTINCT UserID) AS u FROM hits WHERE SearchPhrase <> '' GROUP BY SearchPhrase ORDER
+    // BY u DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, schema_),
+                       MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
+                                  MakeConst(Value(std::string(""))))),
+            MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "u"}},
+                            {GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
+        {SortUnit{MakeVariable("u", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q13"};
+  }
+
  private:
   std::string input_;
   ngn::Schema schema_;
@@ -185,9 +276,10 @@ int main(int argc, char** argv) {
 
   ngn::QueryMaker query_maker(input, ngn::Schema::FromFile(schema));
 
-  std::vector<ngn::QueryInfo> queries = {query_maker.MakeQ0(), query_maker.MakeQ1(), query_maker.MakeQ2(),
-                                         query_maker.MakeQ3(), query_maker.MakeQ4(), query_maker.MakeQ5(),
-                                         query_maker.MakeQ6(), query_maker.MakeQ7(), query_maker.MakeQ8()};
+  std::vector<ngn::QueryInfo> queries = {
+      query_maker.MakeQ0(),  query_maker.MakeQ1(),  query_maker.MakeQ2(),  query_maker.MakeQ3(), query_maker.MakeQ4(),
+      query_maker.MakeQ5(),  query_maker.MakeQ6(),  query_maker.MakeQ7(),  query_maker.MakeQ8(), query_maker.MakeQ9(),
+      query_maker.MakeQ10(), query_maker.MakeQ11(), query_maker.MakeQ12(), query_maker.MakeQ13()};
 
   for (size_t i = 0; i < queries.size(); ++i) {
     auto& q = queries[i];
