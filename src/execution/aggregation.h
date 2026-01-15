@@ -10,6 +10,7 @@ namespace ngn {
 enum class AggregationType {
   kCount,
   kSum,
+  kDistinct,
   kMin,
   kMax,
 };

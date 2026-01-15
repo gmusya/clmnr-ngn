@@ -90,6 +90,29 @@ class QueryMaker {
     return QueryInfo{.plan = plan, .name = "Q3"};
   }
 
+  QueryInfo MakeQ4() {
+    // SELECT COUNT(DISTINCT UserID) FROM hits;
+
+    std::shared_ptr<Operator> plan = MakeAggregate(
+        MakeScan(input_, schema_),
+        MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "distinct"}},
+                        {}));
+
+    return QueryInfo{.plan = plan, .name = "Q4"};
+  }
+
+  QueryInfo MakeQ5() {
+    // SELECT COUNT(DISTINCT SearchPhrase) FROM hits;
+
+    std::shared_ptr<Operator> plan = MakeAggregate(
+        MakeScan(input_, schema_),
+        MakeAggregation(
+            {AggregationUnit{AggregationType::kDistinct, MakeVariable("SearchPhrase", Type::kString), "distinct"}},
+            {}));
+
+    return QueryInfo{.plan = plan, .name = "Q5"};
+  }
+
  private:
   std::string input_;
   ngn::Schema schema_;
@@ -122,12 +145,8 @@ int main(int argc, char** argv) {
 
   ngn::QueryMaker query_maker(input, ngn::Schema::FromFile(schema));
 
-  std::vector<ngn::QueryInfo> queries = {
-      query_maker.MakeQ0(),
-      query_maker.MakeQ1(),
-      query_maker.MakeQ2(),
-      query_maker.MakeQ3(),
-  };
+  std::vector<ngn::QueryInfo> queries = {query_maker.MakeQ0(), query_maker.MakeQ1(), query_maker.MakeQ2(),
+                                         query_maker.MakeQ3(), query_maker.MakeQ4(), query_maker.MakeQ5()};
 
   for (size_t i = 0; i < queries.size(); ++i) {
     auto& q = queries[i];

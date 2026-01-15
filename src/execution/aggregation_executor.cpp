@@ -4,9 +4,11 @@
 #include <limits>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "src/core/value.h"
+#include "src/execution/aggregation.h"
 #include "src/execution/expression.h"
 #include "src/execution/int128.h"
 #include "src/execution/stream.h"
@@ -109,6 +111,20 @@ class SumState : public IState {
 
 std::shared_ptr<IState> MakeSumState(Type output_type) { return std::make_shared<SumState>(output_type); }
 
+class DistinctState : public IState {
+ public:
+  explicit DistinctState() {}
+
+  void Update(const Value& value) override { result_.insert(value); }
+
+  Value Finalize() override { return Value(static_cast<int64_t>(result_.size())); }
+
+ private:
+  std::unordered_set<Value, ValueHash> result_;
+};
+
+std::shared_ptr<IState> MakeDistinctState() { return std::make_shared<DistinctState>(); }
+
 class Aggregator {
  public:
   explicit Aggregator(Aggregation aggregation) : aggregation_(std::move(aggregation)) {
@@ -141,6 +157,8 @@ class Aggregator {
             state.emplace_back(MakeCountState());
           } else if (aggregation_.aggregations[j].type == AggregationType::kSum) {
             state.emplace_back(MakeSumState(GetAggregationType(aggregation_.aggregations[j])));
+          } else if (aggregation_.aggregations[j].type == AggregationType::kDistinct) {
+            state.emplace_back(MakeDistinctState());
           } else {
             THROW_NOT_IMPLEMENTED;
           }
@@ -252,7 +270,7 @@ class Aggregator {
   }
 
   static Type GetAggregationType(const AggregationUnit& unit) {
-    if (unit.type == AggregationType::kCount) {
+    if (unit.type == AggregationType::kCount || unit.type == AggregationType::kDistinct) {
       return Type::kInt64;
     }
     if (unit.type == AggregationType::kSum) {
