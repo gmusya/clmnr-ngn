@@ -261,6 +261,17 @@ class SortStream : public IStream<std::shared_ptr<Batch>> {
   std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
 };
 
+class TopKStream : public IStream<std::shared_ptr<Batch>> {
+ public:
+  TopKStream(std::shared_ptr<TopKOperator> sort) : op_(sort) { stream_ = Execute(sort->child); }
+
+  std::optional<std::shared_ptr<Batch>> Next() override { THROW_NOT_IMPLEMENTED; }
+
+ private:
+  std::shared_ptr<TopKOperator> op_;
+  std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
+};
+
 std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operator> op) {
   ASSERT(op != nullptr);
 
@@ -275,8 +286,8 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
       return std::make_shared<ProjectStream>(std::static_pointer_cast<ProjectOperator>(op));
     case OperatorType::kSort:
       return std::make_shared<SortStream>(std::static_pointer_cast<SortOperator>(op));
-    case OperatorType::kLimit:
-      THROW_NOT_IMPLEMENTED;
+    case OperatorType::kTopK:
+      return std::make_shared<TopKStream>(std::static_pointer_cast<TopKOperator>(op));
     default:
       THROW_NOT_IMPLEMENTED;
   }

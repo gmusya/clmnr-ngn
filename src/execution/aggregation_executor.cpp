@@ -240,6 +240,9 @@ class Aggregator {
         case Type::kInt16:
           columns.emplace_back(Column(ArrayType<Type::kInt16>{}));
           break;
+        case Type::kInt32:
+          columns.emplace_back(Column(ArrayType<Type::kInt32>{}));
+          break;
         case Type::kInt64:
           columns.emplace_back(Column(ArrayType<Type::kInt64>{}));
           break;
