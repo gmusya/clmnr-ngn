@@ -107,7 +107,7 @@ ArrayType<Type::kInt128> Div(const ArrayType<Type::kInt64>& lhs, const ArrayType
   return result;
 }
 
-template<Type type>
+template <Type type>
 ArrayType<Type::kBool> NotEqual(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
   ASSERT(lhs.size() == rhs.size());
 
