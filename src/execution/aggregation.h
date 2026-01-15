@@ -21,16 +21,21 @@ struct AggregationUnit {
   std::string name;
 };
 
+struct GroupByUnit {
+  std::shared_ptr<Expression> expression;
+  std::string name;
+};
+
 struct Aggregation {
-  explicit Aggregation(std::vector<AggregationUnit> aggrs, std::vector<std::shared_ptr<Expression>> group_by)
+  explicit Aggregation(std::vector<AggregationUnit> aggrs, std::vector<GroupByUnit> group_by)
       : aggregations(std::move(aggrs)), group_by_expressions(std::move(group_by)) {}
 
   std::vector<AggregationUnit> aggregations;
-  std::vector<std::shared_ptr<Expression>> group_by_expressions;
+  std::vector<GroupByUnit> group_by_expressions;
 };
 
 inline std::shared_ptr<Aggregation> MakeAggregation(std::vector<AggregationUnit> aggregations,
-                                                    std::vector<std::shared_ptr<Expression>> group_by) {
+                                                    std::vector<GroupByUnit> group_by) {
   return std::make_shared<Aggregation>(std::move(aggregations), std::move(group_by));
 }
 
