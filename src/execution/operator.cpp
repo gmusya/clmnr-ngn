@@ -2,6 +2,7 @@
 
 #include "src/core/columnar.h"
 #include "src/execution/aggregation_executor.h"
+#include "src/execution/batch.h"
 #include "src/execution/stream.h"
 #include "src/util/assert.h"
 #include "src/util/macro.h"
@@ -136,6 +137,17 @@ class ProjectStream : public IStream<std::shared_ptr<Batch>> {
   std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
 };
 
+class SortStream : public IStream<std::shared_ptr<Batch>> {
+ public:
+  SortStream(std::shared_ptr<SortOperator> sort) : op_(sort) { stream_ = Execute(sort->child); }
+
+  std::optional<std::shared_ptr<Batch>> Next() override { THROW_NOT_IMPLEMENTED; }
+
+ private:
+  std::shared_ptr<SortOperator> op_;
+  std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
+};
+
 std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operator> op) {
   ASSERT(op != nullptr);
 
@@ -149,7 +161,7 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
     case OperatorType::kProject:
       return std::make_shared<ProjectStream>(std::static_pointer_cast<ProjectOperator>(op));
     case OperatorType::kSort:
-      THROW_NOT_IMPLEMENTED;
+      return std::make_shared<SortStream>(std::static_pointer_cast<SortOperator>(op));
     case OperatorType::kLimit:
       THROW_NOT_IMPLEMENTED;
     default:
