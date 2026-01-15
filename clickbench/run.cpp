@@ -125,6 +125,21 @@ class QueryMaker {
     return QueryInfo{.plan = plan, .name = "Q6"};
   }
 
+  QueryInfo MakeQ7() {
+    // SELECT AdvEngineID, COUNT(*) FROM hits WHERE AdvEngineID <> 0 GROUP BY AdvEngineID ORDER BY COUNT(*) DESC;
+
+    std::shared_ptr<Operator> plan = MakeSort(
+        MakeAggregate(MakeFilter(MakeScan(input_, schema_),
+                                 MakeBinary(BinaryFunction::kNotEqual, MakeVariable("AdvEngineID", Type::kInt16),
+                                            MakeConst(Value(static_cast<int16_t>(0))))),
+                      MakeAggregation({AggregationUnit{AggregationType::kCount,
+                                                       MakeConst(Value(static_cast<int64_t>(0))), "count"}},
+                                      {GroupByUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"}})),
+        {SortUnit{MakeVariable("count", Type::kInt64), false}});
+
+    return QueryInfo{.plan = plan, .name = "Q7"};
+  }
+
  private:
   std::string input_;
   ngn::Schema schema_;
@@ -159,7 +174,7 @@ int main(int argc, char** argv) {
 
   std::vector<ngn::QueryInfo> queries = {query_maker.MakeQ0(), query_maker.MakeQ1(), query_maker.MakeQ2(),
                                          query_maker.MakeQ3(), query_maker.MakeQ4(), query_maker.MakeQ5(),
-                                         query_maker.MakeQ6()};
+                                         query_maker.MakeQ6(), query_maker.MakeQ7()};
 
   for (size_t i = 0; i < queries.size(); ++i) {
     auto& q = queries[i];

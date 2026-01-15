@@ -75,15 +75,20 @@ struct AggregateOperator : public Operator {
   std::shared_ptr<Aggregation> aggregation;
 };
 
+struct SortUnit {
+  std::shared_ptr<Expression> expression;
+  bool is_ascending;
+};
+
 struct SortOperator : public Operator {
-  SortOperator(std::shared_ptr<Operator> chi, std::vector<std::shared_ptr<Expression>> sk)
+  SortOperator(std::shared_ptr<Operator> chi, std::vector<SortUnit> sk)
       : Operator(OperatorType::kSort), child(std::move(chi)), sort_keys(std::move(sk)) {
     ASSERT(child != nullptr);
     ASSERT(!sort_keys.empty());
   }
 
   std::shared_ptr<Operator> child;
-  std::vector<std::shared_ptr<Expression>> sort_keys;
+  std::vector<SortUnit> sort_keys;
 };
 
 struct LimitOperator : public Operator {
@@ -116,8 +121,7 @@ inline std::shared_ptr<AggregateOperator> MakeAggregate(std::shared_ptr<Operator
   return std::make_shared<AggregateOperator>(std::move(child), std::move(aggregation));
 }
 
-inline std::shared_ptr<SortOperator> MakeSort(std::shared_ptr<Operator> child,
-                                              std::vector<std::shared_ptr<Expression>> sort_keys) {
+inline std::shared_ptr<SortOperator> MakeSort(std::shared_ptr<Operator> child, std::vector<SortUnit> sort_keys) {
   return std::make_shared<SortOperator>(std::move(child), std::move(sort_keys));
 }
 

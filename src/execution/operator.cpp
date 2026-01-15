@@ -1,7 +1,11 @@
 #include "src/execution/operator.h"
 
+#include <algorithm>
+#include <numeric>
+
 #include "src/core/columnar.h"
 #include "src/execution/aggregation_executor.h"
+#include "src/execution/batch.h"
 #include "src/execution/stream.h"
 #include "src/util/assert.h"
 #include "src/util/macro.h"
@@ -136,6 +140,127 @@ class ProjectStream : public IStream<std::shared_ptr<Batch>> {
   std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
 };
 
+class SortStream : public IStream<std::shared_ptr<Batch>> {
+ public:
+  SortStream(std::shared_ptr<SortOperator> sort) : op_(sort) { stream_ = Execute(sort->child); }
+
+  std::optional<std::shared_ptr<Batch>> Next() override {
+    if (returned_) {
+      return std::nullopt;
+    }
+    returned_ = true;
+
+    // 1. Read all batches from the child stream
+    std::vector<std::shared_ptr<Batch>> batches;
+    while (auto batch = stream_->Next()) {
+      batches.emplace_back(batch.value());
+    }
+
+    if (batches.empty()) {
+      return std::nullopt;
+    }
+
+    // 2. Merge all batches into a single batch
+    std::shared_ptr<Batch> merged = MergeBatches(batches);
+    const int64_t num_rows = merged->Rows();
+
+    if (num_rows == 0) {
+      return merged;
+    }
+
+    // 3. Evaluate sort key columns
+    std::vector<Column> sort_columns;
+    sort_columns.reserve(op_->sort_keys.size());
+    for (const auto& sort_key : op_->sort_keys) {
+      sort_columns.emplace_back(Evaluate(merged, sort_key.expression));
+    }
+
+    // 4. Create index array and sort it
+    std::vector<int64_t> indices(num_rows);
+    std::iota(indices.begin(), indices.end(), 0);
+
+    std::sort(indices.begin(), indices.end(), [&](int64_t a, int64_t b) {
+      for (size_t k = 0; k < sort_columns.size(); ++k) {
+        std::strong_ordering cmp = sort_columns[k][a] <=> sort_columns[k][b];
+        if (cmp != 0) {
+          return op_->sort_keys[k].is_ascending ? (cmp < 0) : (cmp > 0);
+        }
+      }
+      return false;
+    });
+
+    // 5. Reorder all columns according to sorted indices
+    std::vector<Column> sorted_columns = ReorderColumns(merged->Columns(), indices);
+
+    return std::make_shared<Batch>(std::move(sorted_columns), merged->GetSchema());
+  }
+
+ private:
+  static std::shared_ptr<Batch> MergeBatches(const std::vector<std::shared_ptr<Batch>>& batches) {
+    ASSERT(!batches.empty());
+
+    const Schema& schema = batches[0]->GetSchema();
+    const size_t num_columns = batches[0]->Columns().size();
+
+    // Calculate total rows
+    int64_t total_rows = 0;
+    for (const auto& batch : batches) {
+      total_rows += batch->Rows();
+    }
+
+    // Create empty columns with reserved capacity
+    std::vector<Column> merged_columns;
+    merged_columns.reserve(num_columns);
+    for (size_t col_idx = 0; col_idx < num_columns; ++col_idx) {
+      std::visit(
+          [&merged_columns, total_rows]<Type type>(const ArrayType<type>&) {
+            ArrayType<type> arr;
+            arr.reserve(total_rows);
+            merged_columns.emplace_back(std::move(arr));
+          },
+          batches[0]->Columns()[col_idx].Values());
+    }
+
+    // Copy data from all batches
+    for (const auto& batch : batches) {
+      for (size_t col_idx = 0; col_idx < num_columns; ++col_idx) {
+        std::visit(
+            [&batch, col_idx]<Type type>(ArrayType<type>& dest) {
+              const auto& src = std::get<ArrayType<type>>(batch->Columns()[col_idx].Values());
+              dest.insert(dest.end(), src.begin(), src.end());
+            },
+            merged_columns[col_idx].Values());
+      }
+    }
+
+    return std::make_shared<Batch>(std::move(merged_columns), schema);
+  }
+
+  static std::vector<Column> ReorderColumns(const std::vector<Column>& columns, const std::vector<int64_t>& indices) {
+    std::vector<Column> result;
+    result.reserve(columns.size());
+
+    for (const auto& column : columns) {
+      std::visit(
+          [&result, &indices]<Type type>(const ArrayType<type>& src) {
+            ArrayType<type> dest;
+            dest.reserve(indices.size());
+            for (int64_t idx : indices) {
+              dest.emplace_back(src[idx]);
+            }
+            result.emplace_back(std::move(dest));
+          },
+          column.Values());
+    }
+
+    return result;
+  }
+
+  bool returned_ = false;
+  std::shared_ptr<SortOperator> op_;
+  std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
+};
+
 std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operator> op) {
   ASSERT(op != nullptr);
 
@@ -149,7 +274,7 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
     case OperatorType::kProject:
       return std::make_shared<ProjectStream>(std::static_pointer_cast<ProjectOperator>(op));
     case OperatorType::kSort:
-      THROW_NOT_IMPLEMENTED;
+      return std::make_shared<SortStream>(std::static_pointer_cast<SortOperator>(op));
     case OperatorType::kLimit:
       THROW_NOT_IMPLEMENTED;
     default:

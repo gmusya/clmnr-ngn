@@ -175,7 +175,7 @@ class Aggregator {
   void Consume(std::shared_ptr<Batch> batch) {
     std::vector<Column> group_by_columns;
     for (const auto& expr : aggregation_.group_by_expressions) {
-      group_by_columns.emplace_back(Evaluate(batch, expr));
+      group_by_columns.emplace_back(Evaluate(batch, expr.expression));
     }
 
     std::vector<Column> value_columns;
@@ -221,15 +221,25 @@ class Aggregator {
 
   Batch Finalize() {
     std::vector<Column> columns;
-    columns.reserve(aggregation_.aggregations.size());
+    columns.reserve(aggregation_.aggregations.size() + aggregation_.group_by_expressions.size());
 
     std::vector<Field> fields;
-    fields.reserve(aggregation_.aggregations.size());
+    fields.reserve(aggregation_.aggregations.size() + aggregation_.group_by_expressions.size());
+    for (const auto& group_by : aggregation_.group_by_expressions) {
+      Type type = GetExpressionType(group_by.expression);
+      fields.emplace_back(Field(group_by.name, type));
+    }
+
     for (const auto& aggr : aggregation_.aggregations) {
       Type type = GetAggregationType(aggr);
       fields.emplace_back(Field(aggr.name, type));
+    }
 
-      switch (type) {
+    for (const auto& field : fields) {
+      switch (field.type) {
+        case Type::kInt16:
+          columns.emplace_back(Column(ArrayType<Type::kInt16>{}));
+          break;
         case Type::kInt64:
           columns.emplace_back(Column(ArrayType<Type::kInt64>{}));
           break;
