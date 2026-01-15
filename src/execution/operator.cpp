@@ -351,91 +351,16 @@ class TopKStream : public IStream<std::shared_ptr<Batch>> {
 
     for (size_t col_idx = 0; col_idx < schema.Fields().size(); ++col_idx) {
       Type type = schema.Fields()[col_idx].type;
-      switch (type) {
-        case Type::kBool: {
-          ArrayType<Type::kBool> arr;
-          arr.reserve(entries.size());
-          for (const auto& entry : entries) {
-            arr.emplace_back(std::get<PhysicalType<Type::kBool>>(entry.row_data[col_idx].GetValue()));
-          }
-          columns.emplace_back(std::move(arr));
-          break;
-        }
-        case Type::kInt16: {
-          ArrayType<Type::kInt16> arr;
-          arr.reserve(entries.size());
-          for (const auto& entry : entries) {
-            arr.emplace_back(std::get<PhysicalType<Type::kInt16>>(entry.row_data[col_idx].GetValue()));
-          }
-          columns.emplace_back(std::move(arr));
-          break;
-        }
-        case Type::kInt32: {
-          ArrayType<Type::kInt32> arr;
-          arr.reserve(entries.size());
-          for (const auto& entry : entries) {
-            arr.emplace_back(std::get<PhysicalType<Type::kInt32>>(entry.row_data[col_idx].GetValue()));
-          }
-          columns.emplace_back(std::move(arr));
-          break;
-        }
-        case Type::kInt64: {
-          ArrayType<Type::kInt64> arr;
-          arr.reserve(entries.size());
-          for (const auto& entry : entries) {
-            arr.emplace_back(std::get<PhysicalType<Type::kInt64>>(entry.row_data[col_idx].GetValue()));
-          }
-          columns.emplace_back(std::move(arr));
-          break;
-        }
-        case Type::kInt128: {
-          ArrayType<Type::kInt128> arr;
-          arr.reserve(entries.size());
-          for (const auto& entry : entries) {
-            arr.emplace_back(std::get<PhysicalType<Type::kInt128>>(entry.row_data[col_idx].GetValue()));
-          }
-          columns.emplace_back(std::move(arr));
-          break;
-        }
-        case Type::kString: {
-          ArrayType<Type::kString> arr;
-          arr.reserve(entries.size());
-          for (const auto& entry : entries) {
-            arr.emplace_back(std::get<PhysicalType<Type::kString>>(entry.row_data[col_idx].GetValue()));
-          }
-          columns.emplace_back(std::move(arr));
-          break;
-        }
-        case Type::kDate: {
-          ArrayType<Type::kDate> arr;
-          arr.reserve(entries.size());
-          for (const auto& entry : entries) {
-            arr.emplace_back(std::get<PhysicalType<Type::kDate>>(entry.row_data[col_idx].GetValue()));
-          }
-          columns.emplace_back(std::move(arr));
-          break;
-        }
-        case Type::kTimestamp: {
-          ArrayType<Type::kTimestamp> arr;
-          arr.reserve(entries.size());
-          for (const auto& entry : entries) {
-            arr.emplace_back(std::get<PhysicalType<Type::kTimestamp>>(entry.row_data[col_idx].GetValue()));
-          }
-          columns.emplace_back(std::move(arr));
-          break;
-        }
-        case Type::kChar: {
-          ArrayType<Type::kChar> arr;
-          arr.reserve(entries.size());
-          for (const auto& entry : entries) {
-            arr.emplace_back(std::get<PhysicalType<Type::kChar>>(entry.row_data[col_idx].GetValue()));
-          }
-          columns.emplace_back(std::move(arr));
-          break;
-        }
-        default:
-          THROW_NOT_IMPLEMENTED;
-      }
+      Dispatch(
+          [&]<Type type>(Tag<type>) {
+            ArrayType<type> arr;
+            arr.reserve(entries.size());
+            for (const auto& entry : entries) {
+              arr.emplace_back(std::get<PhysicalType<type>>(entry.row_data[col_idx].GetValue()));
+            }
+            columns.emplace_back(std::move(arr));
+          },
+          type);
     }
 
     return columns;

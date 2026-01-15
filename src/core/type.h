@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "src/execution/int128.h"
@@ -90,10 +91,50 @@ template <>
 struct PhysicalTypeTrait<Type::kInt128> {
   using PhysicalType = Int128;
 };
+
+}  // namespace internal
+
+template <Type type>
+struct Tag {};
+
+namespace internal {
+
+using AllTypesTrait =
+    std::variant<Tag<Type::kBool>, Tag<Type::kInt16>, Tag<Type::kInt32>, Tag<Type::kInt64>, Tag<Type::kInt128>,
+                 Tag<Type::kChar>, Tag<Type::kString>, Tag<Type::kDate>, Tag<Type::kTimestamp>>;
+
+inline AllTypesTrait CreateTrait(Type type) {
+  switch (type) {
+    case Type::kBool:
+      return Tag<Type::kBool>{};
+    case Type::kInt16:
+      return Tag<Type::kInt16>{};
+    case Type::kInt32:
+      return Tag<Type::kInt32>{};
+    case Type::kInt64:
+      return Tag<Type::kInt64>{};
+    case Type::kInt128:
+      return Tag<Type::kInt128>{};
+    case Type::kDate:
+      return Tag<Type::kDate>{};
+    case Type::kTimestamp:
+      return Tag<Type::kTimestamp>{};
+    case Type::kChar:
+      return Tag<Type::kChar>{};
+    case Type::kString:
+      return Tag<Type::kString>{};
+  }
+}
+
 }  // namespace internal
 
 template <Type type>
 using PhysicalType = internal::PhysicalTypeTrait<type>::PhysicalType;
+
+template <typename Callable>
+auto Dispatch(Callable&& callable, Type type) {
+  return std::visit(std::forward<Callable>(callable), internal::CreateTrait(type));
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
