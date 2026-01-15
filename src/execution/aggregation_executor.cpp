@@ -1,12 +1,14 @@
 #include "src/execution/aggregation_executor.h"
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <unordered_map>
 #include <vector>
 
 #include "src/core/value.h"
 #include "src/execution/expression.h"
+#include "src/execution/int128.h"
 #include "src/execution/stream.h"
 #include "src/util/assert.h"
 #include "src/util/macro.h"
@@ -24,6 +26,13 @@ struct ValueHash {
             return std::hash<int64_t>{}(val.value);
           } else if constexpr (std::is_same_v<T, Boolean>) {
             return std::hash<bool>{}(val.value);
+          } else if constexpr (std::is_same_v<T, Int128>) {
+            const unsigned __int128 uval = static_cast<unsigned __int128>(val);
+            const uint64_t low = static_cast<uint64_t>(uval);
+            const uint64_t high = static_cast<uint64_t>(uval >> 64);
+            size_t h1 = std::hash<uint64_t>{}(low);
+            size_t h2 = std::hash<uint64_t>{}(high);
+            return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
           } else {
             return std::hash<T>{}(val);
           }
@@ -52,6 +61,8 @@ class IState {
 
 class CountState : public IState {
  public:
+  CountState() : count_(0) {}
+
   void Update(const Value&) override { ++count_; }
 
   Value Finalize() override { return Value(count_); }
@@ -64,27 +75,39 @@ std::shared_ptr<IState> MakeCountState() { return std::make_shared<CountState>()
 
 class SumState : public IState {
  public:
-  SumState() : sum_(static_cast<int64_t>(0)) {}
+  explicit SumState(Type output_type) : sum_(static_cast<Int128>(0)), output_type_(output_type) {}
 
   void Update(const Value& value) override {
     if (auto ptr = std::get_if<int64_t>(&value.GetValue()); ptr != nullptr) {
-      sum_ += *ptr;
+      sum_ += static_cast<Int128>(*ptr);
     } else if (auto ptr = std::get_if<int16_t>(&value.GetValue()); ptr != nullptr) {
-      sum_ += *ptr;
+      sum_ += static_cast<Int128>(*ptr);
     } else if (auto ptr = std::get_if<int32_t>(&value.GetValue()); ptr != nullptr) {
+      sum_ += static_cast<Int128>(*ptr);
+    } else if (auto ptr = std::get_if<Int128>(&value.GetValue()); ptr != nullptr) {
       sum_ += *ptr;
     } else {
       THROW_NOT_IMPLEMENTED;
     }
   }
 
-  Value Finalize() override { return Value(sum_); }
+  Value Finalize() override {
+    if (output_type_ == Type::kInt128) {
+      return Value(sum_);
+    }
+    if (sum_ > static_cast<Int128>(std::numeric_limits<int64_t>::max()) ||
+        sum_ < static_cast<Int128>(std::numeric_limits<int64_t>::min())) {
+      THROW_RUNTIME_ERROR("Overlflow");
+    }
+    return Value(static_cast<int64_t>(sum_));
+  }
 
  private:
-  int64_t sum_;
+  Int128 sum_;
+  Type output_type_;
 };
 
-std::shared_ptr<IState> MakeSumState() { return std::make_shared<SumState>(); }
+std::shared_ptr<IState> MakeSumState(Type output_type) { return std::make_shared<SumState>(output_type); }
 
 class Aggregator {
  public:
@@ -117,7 +140,7 @@ class Aggregator {
           if (aggregation_.aggregations[j].type == AggregationType::kCount) {
             state.emplace_back(MakeCountState());
           } else if (aggregation_.aggregations[j].type == AggregationType::kSum) {
-            state.emplace_back(MakeSumState());
+            state.emplace_back(MakeSumState(GetAggregationType(aggregation_.aggregations[j])));
           } else {
             THROW_NOT_IMPLEMENTED;
           }
@@ -140,12 +163,15 @@ class Aggregator {
     std::vector<Field> fields;
     fields.reserve(aggregation_.aggregations.size());
     for (const auto& aggr : aggregation_.aggregations) {
-      Type type = GetAggregationType(aggr.type);
+      Type type = GetAggregationType(aggr);
       fields.emplace_back(Field(aggr.name, type));
 
       switch (type) {
         case Type::kInt64:
           columns.emplace_back(Column(ArrayType<Type::kInt64>{}));
+          break;
+        case Type::kInt128:
+          columns.emplace_back(Column(ArrayType<Type::kInt128>{}));
           break;
         default:
           THROW_NOT_IMPLEMENTED;
@@ -177,12 +203,62 @@ class Aggregator {
   }
 
  private:
-  Type GetAggregationType(AggregationType type) {
-    if (type == AggregationType::kCount || type == AggregationType::kSum) {
-      return Type::kInt64;
-    } else {
-      THROW_NOT_IMPLEMENTED;
+  static Type GetExpressionType(const std::shared_ptr<Expression>& expression) {
+    switch (expression->expr_type) {
+      case ExpressionType::kVariable:
+        return std::static_pointer_cast<Variable>(expression)->type;
+      case ExpressionType::kConst:
+        return std::visit(
+            []<typename T>(const T&) -> Type {
+              if constexpr (std::is_same_v<T, PhysicalType<Type::kBool>>) {
+                return Type::kBool;
+              } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt16>>) {
+                return Type::kInt16;
+              } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt32>>) {
+                return Type::kInt32;
+              } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt64>>) {
+                return Type::kInt64;
+              } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt128>>) {
+                return Type::kInt128;
+              } else if constexpr (std::is_same_v<T, PhysicalType<Type::kString>>) {
+                return Type::kString;
+              } else if constexpr (std::is_same_v<T, PhysicalType<Type::kDate>>) {
+                return Type::kDate;
+              } else if constexpr (std::is_same_v<T, PhysicalType<Type::kTimestamp>>) {
+                return Type::kTimestamp;
+              } else if constexpr (std::is_same_v<T, PhysicalType<Type::kChar>>) {
+                return Type::kChar;
+              } else {
+                static_assert(false, "Unknown type");
+              }
+            },
+            std::static_pointer_cast<Const>(expression)->value.GetValue());
+      default:
+        THROW_NOT_IMPLEMENTED;
     }
+  }
+
+  static Type GetSumOutputType(Type input_type) {
+    switch (input_type) {
+      case Type::kInt16:
+      case Type::kInt32:
+        return Type::kInt64;
+      case Type::kInt64:
+      case Type::kInt128:
+        return Type::kInt128;
+      default:
+        THROW_NOT_IMPLEMENTED;
+    }
+  }
+
+  static Type GetAggregationType(const AggregationUnit& unit) {
+    if (unit.type == AggregationType::kCount) {
+      return Type::kInt64;
+    }
+    if (unit.type == AggregationType::kSum) {
+      return GetSumOutputType(GetExpressionType(unit.expression));
+    }
+    THROW_NOT_IMPLEMENTED;
   }
 
   std::unordered_map<std::vector<Value>, std::vector<std::shared_ptr<IState>>, VectorValueHash> state_;

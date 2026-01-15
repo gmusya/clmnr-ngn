@@ -1,25 +1,23 @@
 #pragma once
 
-#include <cstdint>
 #include <variant>
-#include <vector>
 
 #include "src/core/type.h"
 #include "src/core/value.h"
-#include "src/util/macro.h"
 
 namespace ngn {
 
 class Column {
  public:
   using GenericColumn = std::variant<ArrayType<Type::kBool>, ArrayType<Type::kInt16>, ArrayType<Type::kInt32>,
-                                     ArrayType<Type::kInt64>, ArrayType<Type::kString>, ArrayType<Type::kDate>,
-                                     ArrayType<Type::kTimestamp>, ArrayType<Type::kChar>>;
+                                     ArrayType<Type::kInt64>, ArrayType<Type::kInt128>, ArrayType<Type::kString>,
+                                     ArrayType<Type::kDate>, ArrayType<Type::kTimestamp>, ArrayType<Type::kChar>>;
 
   explicit Column(ArrayType<Type::kBool> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kInt16> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kInt32> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kInt64> values) : values_(std::move(values)) {}
+  explicit Column(ArrayType<Type::kInt128> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kDate> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kTimestamp> values) : values_(std::move(values)) {}
   explicit Column(ArrayType<Type::kChar> values) : values_(std::move(values)) {}

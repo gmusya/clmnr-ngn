@@ -8,14 +8,16 @@ namespace ngn {
 
 class Value {
  public:
-  using GenericValue = std::variant<PhysicalType<Type::kBool>, PhysicalType<Type::kInt16>, PhysicalType<Type::kInt32>,
-                                    PhysicalType<Type::kInt64>, PhysicalType<Type::kString>, PhysicalType<Type::kDate>,
-                                    PhysicalType<Type::kTimestamp>, PhysicalType<Type::kChar>>;
+  using GenericValue =
+      std::variant<PhysicalType<Type::kBool>, PhysicalType<Type::kInt16>, PhysicalType<Type::kInt32>,
+                   PhysicalType<Type::kInt64>, PhysicalType<Type::kInt128>, PhysicalType<Type::kString>,
+                   PhysicalType<Type::kDate>, PhysicalType<Type::kTimestamp>, PhysicalType<Type::kChar>>;
 
   explicit Value(PhysicalType<Type::kBool> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kInt16> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kInt32> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kInt64> value) : value_(std::move(value)) {}
+  explicit Value(PhysicalType<Type::kInt128> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kString> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kDate> value) : value_(std::move(value)) {}
   explicit Value(PhysicalType<Type::kTimestamp> value) : value_(std::move(value)) {}
@@ -37,6 +39,8 @@ class Value {
             return std::to_string(value);
           } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt64>>) {
             return std::to_string(value);
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt128>>) {
+            return Int128ToString(value);
           } else if constexpr (std::is_same_v<T, PhysicalType<Type::kString>>) {
             return value;
           } else if constexpr (std::is_same_v<T, PhysicalType<Type::kDate>>) {

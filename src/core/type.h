@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "src/execution/int128.h"
+
 namespace ngn {
 
 enum class Type {
@@ -11,6 +13,7 @@ enum class Type {
   kInt16,
   kInt32,
   kInt64,
+  kInt128,
   kDate,
   kTimestamp,
   kChar,
@@ -81,6 +84,11 @@ struct PhysicalTypeTrait<Type::kTimestamp> {
 template <>
 struct PhysicalTypeTrait<Type::kChar> {
   using PhysicalType = char;
+};
+
+template <>
+struct PhysicalTypeTrait<Type::kInt128> {
+  using PhysicalType = Int128;
 };
 }  // namespace internal
 

@@ -72,6 +72,20 @@ int64_t Read(std::istream& in) {
 ////////////////////////////////////////////////////////////////////////////////
 
 template <>
+void Write(const Int128& value, std::ostream& out) {
+  out.write(reinterpret_cast<const char*>(&value), sizeof(value));
+}
+
+template <>
+Int128 Read(std::istream& in) {
+  Int128 value;
+  in.read(reinterpret_cast<char*>(&value), sizeof(value));
+  return value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <>
 void Write(const std::string& value, std::ostream& out) {
   int64_t sz = value.size();
   Write(sz, out);

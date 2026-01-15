@@ -256,6 +256,12 @@ class FileReader {
           result.emplace_back(std::move(col));
           break;
         }
+        case Type::kInt128: {
+          auto col = internal::ReadColumn<Type::kInt128>(file_);
+          ASSERT(static_cast<int64_t>(col.size()) == row_count);
+          result.emplace_back(std::move(col));
+          break;
+        }
         case Type::kString: {
           auto col = internal::ReadColumn<Type::kString>(file_);
           ASSERT(static_cast<int64_t>(col.size()) == row_count);
@@ -326,6 +332,11 @@ class FileReader {
       }
       case Type::kInt64: {
         auto col = internal::ReadColumn<Type::kInt64>(file_);
+        ASSERT(static_cast<int64_t>(col.size()) == row_count);
+        return Column(std::move(col));
+      }
+      case Type::kInt128: {
+        auto col = internal::ReadColumn<Type::kInt128>(file_);
         ASSERT(static_cast<int64_t>(col.size()) == row_count);
         return Column(std::move(col));
       }
