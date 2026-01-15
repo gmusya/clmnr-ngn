@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <queue>
 
 #include "src/core/columnar.h"
 #include "src/execution/aggregation_executor.h"
@@ -150,7 +151,6 @@ class SortStream : public IStream<std::shared_ptr<Batch>> {
     }
     returned_ = true;
 
-    // 1. Read all batches from the child stream
     std::vector<std::shared_ptr<Batch>> batches;
     while (auto batch = stream_->Next()) {
       batches.emplace_back(batch.value());
@@ -160,7 +160,6 @@ class SortStream : public IStream<std::shared_ptr<Batch>> {
       return std::nullopt;
     }
 
-    // 2. Merge all batches into a single batch
     std::shared_ptr<Batch> merged = MergeBatches(batches);
     const int64_t num_rows = merged->Rows();
 
@@ -168,14 +167,12 @@ class SortStream : public IStream<std::shared_ptr<Batch>> {
       return merged;
     }
 
-    // 3. Evaluate sort key columns
     std::vector<Column> sort_columns;
     sort_columns.reserve(op_->sort_keys.size());
     for (const auto& sort_key : op_->sort_keys) {
       sort_columns.emplace_back(Evaluate(merged, sort_key.expression));
     }
 
-    // 4. Create index array and sort it
     std::vector<int64_t> indices(num_rows);
     std::iota(indices.begin(), indices.end(), 0);
 
@@ -189,10 +186,7 @@ class SortStream : public IStream<std::shared_ptr<Batch>> {
       return false;
     });
 
-    // 5. Reorder all columns according to sorted indices
-    std::vector<Column> sorted_columns = ReorderColumns(merged->Columns(), indices);
-
-    return std::make_shared<Batch>(std::move(sorted_columns), merged->GetSchema());
+    return std::make_shared<Batch>(ReorderColumns(merged->Columns(), indices), merged->GetSchema());
   }
 
  private:
@@ -202,13 +196,11 @@ class SortStream : public IStream<std::shared_ptr<Batch>> {
     const Schema& schema = batches[0]->GetSchema();
     const size_t num_columns = batches[0]->Columns().size();
 
-    // Calculate total rows
     int64_t total_rows = 0;
     for (const auto& batch : batches) {
       total_rows += batch->Rows();
     }
 
-    // Create empty columns with reserved capacity
     std::vector<Column> merged_columns;
     merged_columns.reserve(num_columns);
     for (size_t col_idx = 0; col_idx < num_columns; ++col_idx) {
@@ -221,7 +213,6 @@ class SortStream : public IStream<std::shared_ptr<Batch>> {
           batches[0]->Columns()[col_idx].Values());
     }
 
-    // Copy data from all batches
     for (const auto& batch : batches) {
       for (size_t col_idx = 0; col_idx < num_columns; ++col_idx) {
         std::visit(
@@ -261,6 +252,200 @@ class SortStream : public IStream<std::shared_ptr<Batch>> {
   std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
 };
 
+class TopKStream : public IStream<std::shared_ptr<Batch>> {
+ private:
+  struct HeapEntry {
+    std::vector<Value> row_data;
+    std::vector<Value> sort_keys;
+  };
+
+ public:
+  TopKStream(std::shared_ptr<TopKOperator> topk) : op_(topk) { stream_ = Execute(topk->child); }
+
+  std::optional<std::shared_ptr<Batch>> Next() override {
+    if (returned_) {
+      return std::nullopt;
+    }
+    returned_ = true;
+
+    auto is_better = [this](const HeapEntry& a, const HeapEntry& b) -> bool {
+      for (size_t i = 0; i < a.sort_keys.size(); ++i) {
+        std::strong_ordering cmp = a.sort_keys[i] <=> b.sort_keys[i];
+        if (cmp != 0) {
+          return op_->sort_keys[i].is_ascending ? (cmp < 0) : (cmp > 0);
+        }
+      }
+      return false;
+    };
+
+    auto heap_cmp = [&is_better](const HeapEntry& a, const HeapEntry& b) -> bool { return is_better(a, b); };
+
+    std::priority_queue<HeapEntry, std::vector<HeapEntry>, decltype(heap_cmp)> heap(heap_cmp);
+
+    const uint32_t k = op_->limit;
+    std::optional<Schema> schema;
+
+    while (auto batch_opt = stream_->Next()) {
+      std::shared_ptr<Batch> batch = batch_opt.value();
+      if (!schema.has_value()) {
+        schema = batch->GetSchema();
+      }
+
+      std::vector<Column> sort_columns;
+      sort_columns.reserve(op_->sort_keys.size());
+      for (const auto& sort_key : op_->sort_keys) {
+        sort_columns.emplace_back(Evaluate(batch, sort_key.expression));
+      }
+
+      for (int64_t row_idx = 0; row_idx < batch->Rows(); ++row_idx) {
+        std::vector<Value> sort_keys;
+        sort_keys.reserve(sort_columns.size());
+        for (const auto& col : sort_columns) {
+          sort_keys.emplace_back(col[row_idx]);
+        }
+
+        bool should_insert = false;
+        if (heap.size() < k) {
+          should_insert = true;
+        } else {
+          HeapEntry candidate{.row_data = {}, .sort_keys = std::move(sort_keys)};
+          if (is_better(candidate, heap.top())) {
+            should_insert = true;
+            heap.pop();
+          }
+          sort_keys = std::move(candidate.sort_keys);
+        }
+
+        if (should_insert) {
+          std::vector<Value> row_data;
+          row_data.reserve(batch->Columns().size());
+          for (const auto& col : batch->Columns()) {
+            row_data.emplace_back(col[row_idx]);
+          }
+
+          heap.push(HeapEntry{.row_data = std::move(row_data), .sort_keys = std::move(sort_keys)});
+        }
+      }
+    }
+
+    if (!schema.has_value() || heap.empty()) {
+      return std::nullopt;
+    }
+
+    std::vector<HeapEntry> entries;
+    entries.reserve(heap.size());
+    while (!heap.empty()) {
+      entries.emplace_back(heap.top());
+      heap.pop();
+    }
+
+    std::sort(entries.begin(), entries.end(), is_better);
+
+    return std::make_shared<Batch>(BuildColumns(schema.value(), entries), schema.value());
+  }
+
+ private:
+  static std::vector<Column> BuildColumns(const Schema& schema, const std::vector<HeapEntry>& entries) {
+    std::vector<Column> columns;
+    columns.reserve(schema.Fields().size());
+
+    for (size_t col_idx = 0; col_idx < schema.Fields().size(); ++col_idx) {
+      Type type = schema.Fields()[col_idx].type;
+      switch (type) {
+        case Type::kBool: {
+          ArrayType<Type::kBool> arr;
+          arr.reserve(entries.size());
+          for (const auto& entry : entries) {
+            arr.emplace_back(std::get<PhysicalType<Type::kBool>>(entry.row_data[col_idx].GetValue()));
+          }
+          columns.emplace_back(std::move(arr));
+          break;
+        }
+        case Type::kInt16: {
+          ArrayType<Type::kInt16> arr;
+          arr.reserve(entries.size());
+          for (const auto& entry : entries) {
+            arr.emplace_back(std::get<PhysicalType<Type::kInt16>>(entry.row_data[col_idx].GetValue()));
+          }
+          columns.emplace_back(std::move(arr));
+          break;
+        }
+        case Type::kInt32: {
+          ArrayType<Type::kInt32> arr;
+          arr.reserve(entries.size());
+          for (const auto& entry : entries) {
+            arr.emplace_back(std::get<PhysicalType<Type::kInt32>>(entry.row_data[col_idx].GetValue()));
+          }
+          columns.emplace_back(std::move(arr));
+          break;
+        }
+        case Type::kInt64: {
+          ArrayType<Type::kInt64> arr;
+          arr.reserve(entries.size());
+          for (const auto& entry : entries) {
+            arr.emplace_back(std::get<PhysicalType<Type::kInt64>>(entry.row_data[col_idx].GetValue()));
+          }
+          columns.emplace_back(std::move(arr));
+          break;
+        }
+        case Type::kInt128: {
+          ArrayType<Type::kInt128> arr;
+          arr.reserve(entries.size());
+          for (const auto& entry : entries) {
+            arr.emplace_back(std::get<PhysicalType<Type::kInt128>>(entry.row_data[col_idx].GetValue()));
+          }
+          columns.emplace_back(std::move(arr));
+          break;
+        }
+        case Type::kString: {
+          ArrayType<Type::kString> arr;
+          arr.reserve(entries.size());
+          for (const auto& entry : entries) {
+            arr.emplace_back(std::get<PhysicalType<Type::kString>>(entry.row_data[col_idx].GetValue()));
+          }
+          columns.emplace_back(std::move(arr));
+          break;
+        }
+        case Type::kDate: {
+          ArrayType<Type::kDate> arr;
+          arr.reserve(entries.size());
+          for (const auto& entry : entries) {
+            arr.emplace_back(std::get<PhysicalType<Type::kDate>>(entry.row_data[col_idx].GetValue()));
+          }
+          columns.emplace_back(std::move(arr));
+          break;
+        }
+        case Type::kTimestamp: {
+          ArrayType<Type::kTimestamp> arr;
+          arr.reserve(entries.size());
+          for (const auto& entry : entries) {
+            arr.emplace_back(std::get<PhysicalType<Type::kTimestamp>>(entry.row_data[col_idx].GetValue()));
+          }
+          columns.emplace_back(std::move(arr));
+          break;
+        }
+        case Type::kChar: {
+          ArrayType<Type::kChar> arr;
+          arr.reserve(entries.size());
+          for (const auto& entry : entries) {
+            arr.emplace_back(std::get<PhysicalType<Type::kChar>>(entry.row_data[col_idx].GetValue()));
+          }
+          columns.emplace_back(std::move(arr));
+          break;
+        }
+        default:
+          THROW_NOT_IMPLEMENTED;
+      }
+    }
+
+    return columns;
+  }
+
+  bool returned_ = false;
+  std::shared_ptr<TopKOperator> op_;
+  std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
+};
+
 std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operator> op) {
   ASSERT(op != nullptr);
 
@@ -275,8 +460,8 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
       return std::make_shared<ProjectStream>(std::static_pointer_cast<ProjectOperator>(op));
     case OperatorType::kSort:
       return std::make_shared<SortStream>(std::static_pointer_cast<SortOperator>(op));
-    case OperatorType::kLimit:
-      THROW_NOT_IMPLEMENTED;
+    case OperatorType::kTopK:
+      return std::make_shared<TopKStream>(std::static_pointer_cast<TopKOperator>(op));
     default:
       THROW_NOT_IMPLEMENTED;
   }

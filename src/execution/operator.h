@@ -15,7 +15,7 @@ enum class OperatorType {
   kProject,
   kAggregate,
   kSort,
-  kLimit,
+  kTopK,
 };
 
 struct Operator {
@@ -91,6 +91,19 @@ struct SortOperator : public Operator {
   std::vector<SortUnit> sort_keys;
 };
 
+struct TopKOperator : public Operator {
+  TopKOperator(std::shared_ptr<Operator> chi, std::vector<SortUnit> sk, uint32_t lim)
+      : Operator(OperatorType::kTopK), child(std::move(chi)), sort_keys(std::move(sk)), limit(lim) {
+    ASSERT(child != nullptr);
+    ASSERT(!sort_keys.empty());
+  }
+
+  std::shared_ptr<Operator> child;
+  std::vector<SortUnit> sort_keys;
+  uint32_t limit;
+};
+
+#if 0
 struct LimitOperator : public Operator {
   LimitOperator(std::shared_ptr<Operator> chi, int64_t lim)
       : Operator(OperatorType::kLimit), child(std::move(chi)), limit(lim) {
@@ -101,6 +114,7 @@ struct LimitOperator : public Operator {
   std::shared_ptr<Operator> child;
   int64_t limit;
 };
+#endif
 
 inline std::shared_ptr<ScanOperator> MakeScan(std::string input_path, Schema schema) {
   return std::make_shared<ScanOperator>(std::move(input_path), std::move(schema));
@@ -125,9 +139,16 @@ inline std::shared_ptr<SortOperator> MakeSort(std::shared_ptr<Operator> child, s
   return std::make_shared<SortOperator>(std::move(child), std::move(sort_keys));
 }
 
+inline std::shared_ptr<TopKOperator> MakeTopK(std::shared_ptr<Operator> child, std::vector<SortUnit> sort_keys,
+                                              uint32_t limit) {
+  return std::make_shared<TopKOperator>(std::move(child), std::move(sort_keys), limit);
+}
+
+#if 0
 inline std::shared_ptr<LimitOperator> MakeLimit(std::shared_ptr<Operator> child, int64_t limit) {
   return std::make_shared<LimitOperator>(std::move(child), std::move(limit));
 }
+#endif
 
 std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operator> op);
 

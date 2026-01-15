@@ -140,6 +140,19 @@ class QueryMaker {
     return QueryInfo{.plan = plan, .name = "Q7"};
   }
 
+  QueryInfo MakeQ8() {
+    // SELECT RegionID, COUNT(DISTINCT UserID) AS u FROM hits GROUP BY RegionID ORDER BY u DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeScan(input_, schema_),
+            MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "u"}},
+                            {GroupByUnit{MakeVariable("RegionID", Type::kInt32), "RegionID"}})),
+        {SortUnit{MakeVariable("u", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q8"};
+  }
+
  private:
   std::string input_;
   ngn::Schema schema_;
@@ -174,7 +187,7 @@ int main(int argc, char** argv) {
 
   std::vector<ngn::QueryInfo> queries = {query_maker.MakeQ0(), query_maker.MakeQ1(), query_maker.MakeQ2(),
                                          query_maker.MakeQ3(), query_maker.MakeQ4(), query_maker.MakeQ5(),
-                                         query_maker.MakeQ6(), query_maker.MakeQ7()};
+                                         query_maker.MakeQ6(), query_maker.MakeQ7(), query_maker.MakeQ8()};
 
   for (size_t i = 0; i < queries.size(); ++i) {
     auto& q = queries[i];
