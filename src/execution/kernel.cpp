@@ -107,7 +107,8 @@ ArrayType<Type::kInt128> Div(const ArrayType<Type::kInt64>& lhs, const ArrayType
   return result;
 }
 
-ArrayType<Type::kBool> NotEqual(const ArrayType<Type::kInt16>& lhs, const ArrayType<Type::kInt16>& rhs) {
+template<Type type>
+ArrayType<Type::kBool> NotEqual(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
   ASSERT(lhs.size() == rhs.size());
 
   ArrayType<Type::kBool> result(lhs.size());
@@ -184,12 +185,21 @@ Column Less(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
 Column Greater(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
 Column Equal(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
 Column NotEqual(const Column& lhs, const Column& rhs) {
-  ASSERT(lhs.GetType() == Type::kInt16);
-  ASSERT(rhs.GetType() == Type::kInt16);
+  ASSERT(lhs.GetType() == rhs.GetType());
 
-  return Column(internal::NotEqual(std::get<ArrayType<Type::kInt16>>(lhs.Values()),
-                                   std::get<ArrayType<Type::kInt16>>(rhs.Values())));
+  if (lhs.GetType() == Type::kInt16) {
+    return Column(internal::NotEqual(std::get<ArrayType<Type::kInt16>>(lhs.Values()),
+                                     std::get<ArrayType<Type::kInt16>>(rhs.Values())));
+  }
+
+  if (lhs.GetType() == Type::kString) {
+    return Column(internal::NotEqual(std::get<ArrayType<Type::kString>>(lhs.Values()),
+                                     std::get<ArrayType<Type::kString>>(rhs.Values())));
+  }
+
+  THROW_NOT_IMPLEMENTED;
 }
+
 Column LessOrEqual(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
 Column GreaterOrEqual(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
 

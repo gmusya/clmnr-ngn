@@ -252,8 +252,11 @@ class Aggregator {
         case Type::kDate:
           columns.emplace_back(Column(ArrayType<Type::kDate>{}));
           break;
+        case Type::kString:
+          columns.emplace_back(Column(ArrayType<Type::kString>{}));
+          break;
         default:
-          THROW_NOT_IMPLEMENTED;
+          THROW_RUNTIME_ERROR("Unimplemented for type " + std::to_string(static_cast<int>(field.type)));
       }
     }
 
