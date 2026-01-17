@@ -10,80 +10,44 @@ namespace ngn {
 
 namespace internal {
 
-ArrayType<Type::kInt64> Add(const ArrayType<Type::kInt64>& lhs, const ArrayType<Type::kInt64>& rhs) {
+template <Type type>
+ArrayType<type> Add(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
   ASSERT(lhs.size() == rhs.size());
 
-  ArrayType<Type::kInt64> result(lhs.size());
+  ArrayType<type> result(lhs.size());
   for (size_t i = 0; i < lhs.size(); ++i) {
     result[i] = lhs[i] + rhs[i];
   }
   return result;
 }
 
-ArrayType<Type::kInt128> Add(const ArrayType<Type::kInt128>& lhs, const ArrayType<Type::kInt128>& rhs) {
+template <Type type>
+ArrayType<type> Sub(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
   ASSERT(lhs.size() == rhs.size());
 
-  ArrayType<Type::kInt128> result(lhs.size());
-  for (size_t i = 0; i < lhs.size(); ++i) {
-    result[i] = lhs[i] + rhs[i];
-  }
-  return result;
-}
-
-ArrayType<Type::kInt64> Sub(const ArrayType<Type::kInt64>& lhs, const ArrayType<Type::kInt64>& rhs) {
-  ASSERT(lhs.size() == rhs.size());
-
-  ArrayType<Type::kInt64> result(lhs.size());
+  ArrayType<type> result(lhs.size());
   for (size_t i = 0; i < lhs.size(); ++i) {
     result[i] = lhs[i] - rhs[i];
   }
   return result;
 }
 
-ArrayType<Type::kInt128> Sub(const ArrayType<Type::kInt128>& lhs, const ArrayType<Type::kInt128>& rhs) {
+template <Type type>
+ArrayType<type> Mult(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
   ASSERT(lhs.size() == rhs.size());
 
-  ArrayType<Type::kInt128> result(lhs.size());
-  for (size_t i = 0; i < lhs.size(); ++i) {
-    result[i] = lhs[i] - rhs[i];
-  }
-  return result;
-}
-
-ArrayType<Type::kInt64> Mult(const ArrayType<Type::kInt64>& lhs, const ArrayType<Type::kInt64>& rhs) {
-  ASSERT(lhs.size() == rhs.size());
-
-  ArrayType<Type::kInt64> result(lhs.size());
+  ArrayType<type> result(lhs.size());
   for (size_t i = 0; i < lhs.size(); ++i) {
     result[i] = lhs[i] * rhs[i];
   }
   return result;
 }
 
-ArrayType<Type::kInt128> Mult(const ArrayType<Type::kInt128>& lhs, const ArrayType<Type::kInt128>& rhs) {
+template <Type type>
+ArrayType<type> Div(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
   ASSERT(lhs.size() == rhs.size());
 
-  ArrayType<Type::kInt128> result(lhs.size());
-  for (size_t i = 0; i < lhs.size(); ++i) {
-    result[i] = lhs[i] * rhs[i];
-  }
-  return result;
-}
-
-ArrayType<Type::kInt64> Div(const ArrayType<Type::kInt64>& lhs, const ArrayType<Type::kInt64>& rhs) {
-  ASSERT(lhs.size() == rhs.size());
-
-  ArrayType<Type::kInt64> result(lhs.size());
-  for (size_t i = 0; i < lhs.size(); ++i) {
-    result[i] = lhs[i] / rhs[i];
-  }
-  return result;
-}
-
-ArrayType<Type::kInt128> Div(const ArrayType<Type::kInt128>& lhs, const ArrayType<Type::kInt128>& rhs) {
-  ASSERT(lhs.size() == rhs.size());
-
-  ArrayType<Type::kInt128> result(lhs.size());
+  ArrayType<type> result(lhs.size());
   for (size_t i = 0; i < lhs.size(); ++i) {
     result[i] = lhs[i] / rhs[i];
   }
@@ -117,6 +81,26 @@ ArrayType<Type::kBool> Compare(const ArrayType<type>& lhs, const ArrayType<type>
   ArrayType<Type::kBool> result(lhs.size());
   for (size_t i = 0; i < lhs.size(); ++i) {
     result[i] = Boolean{Comparator{}(lhs[i], rhs[i])};
+  }
+  return result;
+}
+
+ArrayType<Type::kBool> And(const ArrayType<Type::kBool>& lhs, const ArrayType<Type::kBool>& rhs) {
+  ASSERT(lhs.size() == rhs.size());
+
+  ArrayType<Type::kBool> result(lhs.size());
+  for (size_t i = 0; i < lhs.size(); ++i) {
+    result[i] = Boolean{lhs[i].value && rhs[i].value};
+  }
+  return result;
+}
+
+ArrayType<Type::kBool> Or(const ArrayType<Type::kBool>& lhs, const ArrayType<Type::kBool>& rhs) {
+  ASSERT(lhs.size() == rhs.size());
+
+  ArrayType<Type::kBool> result(lhs.size());
+  for (size_t i = 0; i < lhs.size(); ++i) {
+    result[i] = Boolean{lhs[i].value || rhs[i].value};
   }
   return result;
 }
@@ -212,8 +196,21 @@ Column Div(const Column& lhs, const Column& rhs) {
   THROW_NOT_IMPLEMENTED;
 }
 
-Column And(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
-Column Or(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
+Column And(const Column& lhs, const Column& rhs) {
+  ASSERT(lhs.GetType() == Type::kBool);
+  ASSERT(rhs.GetType() == Type::kBool);
+
+  return Column(
+      internal::And(std::get<ArrayType<Type::kBool>>(lhs.Values()), std::get<ArrayType<Type::kBool>>(rhs.Values())));
+}
+
+Column Or(const Column& lhs, const Column& rhs) {
+  ASSERT(lhs.GetType() == Type::kBool);
+  ASSERT(rhs.GetType() == Type::kBool);
+
+  return Column(
+      internal::Or(std::get<ArrayType<Type::kBool>>(lhs.Values()), std::get<ArrayType<Type::kBool>>(rhs.Values())));
+}
 
 Column Less(const Column& lhs, const Column& rhs) {
   return Column(Dispatch(
@@ -268,5 +265,7 @@ Column LikeMatch(const Column&, const std::string&, bool) { THROW_NOT_IMPLEMENTE
 
 Column Not(const Column&) { THROW_NOT_IMPLEMENTED; }
 Column ExtractMinute(const Column&) { THROW_NOT_IMPLEMENTED; }
+Column StrLen(const Column&) { THROW_NOT_IMPLEMENTED; }
+Column DateTruncMinute(const Column&) { THROW_NOT_IMPLEMENTED; }
 
 }  // namespace ngn

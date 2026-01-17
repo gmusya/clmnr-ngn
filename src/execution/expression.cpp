@@ -88,6 +88,10 @@ Column EvaluateUnary(std::shared_ptr<Batch> batch, std::shared_ptr<Unary> expres
       return Not(operand);
     case UnaryFunction::kExtractMinute:
       return ExtractMinute(operand);
+    case UnaryFunction::kStrLen:
+      return StrLen(operand);
+    case UnaryFunction::kDateTruncMinute:
+      return DateTruncMinute(operand);
     default:
       THROW_NOT_IMPLEMENTED;
   }
@@ -97,6 +101,12 @@ Column EvaluateLike(std::shared_ptr<Batch> batch, std::shared_ptr<Like> expressi
   Column operand = Evaluate(batch, expression->operand);
   return LikeMatch(operand, expression->pattern, expression->negated);
 }
+
+Column EvaluateIn(std::shared_ptr<Batch>, std::shared_ptr<In>) { THROW_NOT_IMPLEMENTED; }
+
+Column EvaluateCase(std::shared_ptr<Batch>, std::shared_ptr<Case>) { THROW_NOT_IMPLEMENTED; }
+
+Column EvaluateRegexReplace(std::shared_ptr<Batch>, std::shared_ptr<RegexReplace>) { THROW_NOT_IMPLEMENTED; }
 
 }  // namespace
 
@@ -112,6 +122,12 @@ Column Evaluate(std::shared_ptr<Batch> batch, std::shared_ptr<Expression> expres
       return EvaluateBinary(batch, std::static_pointer_cast<Binary>(expression));
     case ExpressionType::kLike:
       return EvaluateLike(batch, std::static_pointer_cast<Like>(expression));
+    case ExpressionType::kIn:
+      return EvaluateIn(batch, std::static_pointer_cast<In>(expression));
+    case ExpressionType::kCase:
+      return EvaluateCase(batch, std::static_pointer_cast<Case>(expression));
+    case ExpressionType::kRegexReplace:
+      return EvaluateRegexReplace(batch, std::static_pointer_cast<RegexReplace>(expression));
     default:
       THROW_NOT_IMPLEMENTED;
   }

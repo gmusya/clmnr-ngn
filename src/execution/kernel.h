@@ -24,5 +24,7 @@ Column LikeMatch(const Column& operand, const std::string& pattern, bool negated
 // Unary operations
 Column Not(const Column& operand);
 Column ExtractMinute(const Column& operand);
+Column StrLen(const Column& operand);
+Column DateTruncMinute(const Column& operand);
 
 }  // namespace ngn
