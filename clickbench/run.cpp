@@ -1,3 +1,4 @@
+#include <chrono>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -341,11 +342,11 @@ class QueryMaker {
   QueryInfo MakeQ19() {
     // SELECT UserID FROM hits WHERE UserID = 435090932899640449;
 
-    std::shared_ptr<Operator> plan = MakeProject(
-        MakeFilter(MakeScan(input_, S({"UserID"})),
-                   MakeBinary(BinaryFunction::kEqual, MakeVariable("UserID", Type::kInt64),
-                              MakeConst(Value(static_cast<int64_t>(435090932899640449LL))))),
-        {ProjectionUnit{MakeVariable("UserID", Type::kInt64), "UserID"}});
+    std::shared_ptr<Operator> plan =
+        MakeProject(MakeFilter(MakeScan(input_, S({"UserID"})),
+                               MakeBinary(BinaryFunction::kEqual, MakeVariable("UserID", Type::kInt64),
+                                          MakeConst(Value(static_cast<int64_t>(435090932899640449LL))))),
+                    {ProjectionUnit{MakeVariable("UserID", Type::kInt64), "UserID"}});
 
     return QueryInfo{.plan = plan, .name = "Q19"};
   }
@@ -407,15 +408,14 @@ class QueryMaker {
     // SELECT * FROM hits WHERE URL LIKE '%google%' ORDER BY EventTime LIMIT 10;
     // Note: projecting subset of columns for demonstration
 
-    std::shared_ptr<Operator> plan = MakeTopK(
-        MakeProject(
-            MakeFilter(MakeScan(input_, S({"WatchID", "EventTime", "URL", "Title"})),
-                       MakeLike(MakeVariable("URL", Type::kString), "%google%")),
-            {ProjectionUnit{MakeVariable("WatchID", Type::kInt64), "WatchID"},
-             ProjectionUnit{MakeVariable("EventTime", Type::kTimestamp), "EventTime"},
-             ProjectionUnit{MakeVariable("URL", Type::kString), "URL"},
-             ProjectionUnit{MakeVariable("Title", Type::kString), "Title"}}),
-        {SortUnit{MakeVariable("EventTime", Type::kTimestamp), true}}, 10);
+    std::shared_ptr<Operator> plan =
+        MakeTopK(MakeProject(MakeFilter(MakeScan(input_, S({"WatchID", "EventTime", "URL", "Title"})),
+                                        MakeLike(MakeVariable("URL", Type::kString), "%google%")),
+                             {ProjectionUnit{MakeVariable("WatchID", Type::kInt64), "WatchID"},
+                              ProjectionUnit{MakeVariable("EventTime", Type::kTimestamp), "EventTime"},
+                              ProjectionUnit{MakeVariable("URL", Type::kString), "URL"},
+                              ProjectionUnit{MakeVariable("Title", Type::kString), "Title"}}),
+                 {SortUnit{MakeVariable("EventTime", Type::kTimestamp), true}}, 10);
 
     return QueryInfo{.plan = plan, .name = "Q23"};
   }
@@ -548,9 +548,9 @@ class QueryMaker {
       aggregations.push_back(AggregationUnit{AggregationType::kSum, MakeVariable(col_name, Type::kInt16), col_name});
     }
 
-    std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeProject(MakeScan(input_, S({"ResolutionWidth"})), std::move(projections)),
-        MakeAggregation(std::move(aggregations), {}));
+    std::shared_ptr<Operator> plan =
+        MakeAggregate(MakeProject(MakeScan(input_, S({"ResolutionWidth"})), std::move(projections)),
+                      MakeAggregation(std::move(aggregations), {}));
 
     return QueryInfo{.plan = plan, .name = "Q29"};
   }
@@ -562,10 +562,10 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeProject(
             MakeAggregate(
-                MakeFilter(MakeScan(input_, S({"SearchPhrase", "SearchEngineID", "ClientIP", "IsRefresh",
-                                               "ResolutionWidth"})),
-                           MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
-                                      MakeConst(Value(std::string(""))))),
+                MakeFilter(
+                    MakeScan(input_, S({"SearchPhrase", "SearchEngineID", "ClientIP", "IsRefresh", "ResolutionWidth"})),
+                    MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
+                               MakeConst(Value(std::string(""))))),
                 MakeAggregation(
                     {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"},
                      AggregationUnit{AggregationType::kSum, MakeVariable("IsRefresh", Type::kInt16), "sum_refresh"},
@@ -592,10 +592,9 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeProject(
             MakeAggregate(
-                MakeFilter(
-                    MakeScan(input_, S({"SearchPhrase", "WatchID", "ClientIP", "IsRefresh", "ResolutionWidth"})),
-                    MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
-                               MakeConst(Value(std::string(""))))),
+                MakeFilter(MakeScan(input_, S({"SearchPhrase", "WatchID", "ClientIP", "IsRefresh", "ResolutionWidth"})),
+                           MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
+                                      MakeConst(Value(std::string(""))))),
                 MakeAggregation(
                     {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"},
                      AggregationUnit{AggregationType::kSum, MakeVariable("IsRefresh", Type::kInt16), "sum_refresh"},
@@ -730,12 +729,11 @@ class QueryMaker {
         MakeBinary(BinaryFunction::kNotEqual, MakeVariable("URL", Type::kString), MakeConst(Value(std::string("")))));
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(
-            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "URL"})),
-                       filter_cond),
-            MakeAggregation(
-                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
+        MakeAggregate(MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "URL"})),
+                                 filter_cond),
+                      MakeAggregation({AggregationUnit{AggregationType::kCount,
+                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                                      {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10);
 
     return QueryInfo{.plan = plan, .name = "Q36"};
@@ -767,12 +765,11 @@ class QueryMaker {
         MakeBinary(BinaryFunction::kNotEqual, MakeVariable("Title", Type::kString), MakeConst(Value(std::string("")))));
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(
-            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "Title"})),
-                       filter_cond),
-            MakeAggregation(
-                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                {GroupByUnit{MakeVariable("Title", Type::kString), "Title"}})),
+        MakeAggregate(MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "Title"})),
+                                 filter_cond),
+                      MakeAggregation({AggregationUnit{AggregationType::kCount,
+                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                                      {GroupByUnit{MakeVariable("Title", Type::kString), "Title"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10);
 
     return QueryInfo{.plan = plan, .name = "Q37"};
@@ -843,17 +840,16 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeProject(
-                MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID", "SearchEngineID",
-                                               "AdvEngineID", "Referer", "URL"})),
-                           filter_cond),
-                {ProjectionUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
-                 ProjectionUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
-                 ProjectionUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
-                 ProjectionUnit{MakeCase(case_condition, MakeVariable("Referer", Type::kString),
-                                         MakeConst(Value(std::string("")))),
-                                "Src"},
-                 ProjectionUnit{MakeVariable("URL", Type::kString), "Dst"}}),
+            MakeProject(MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID",
+                                                       "SearchEngineID", "AdvEngineID", "Referer", "URL"})),
+                                   filter_cond),
+                        {ProjectionUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
+                         ProjectionUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
+                         ProjectionUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
+                         ProjectionUnit{MakeCase(case_condition, MakeVariable("Referer", Type::kString),
+                                                 MakeConst(Value(std::string("")))),
+                                        "Src"},
+                         ProjectionUnit{MakeVariable("URL", Type::kString), "Dst"}}),
             MakeAggregation(
                 {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
                 {GroupByUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
@@ -894,9 +890,9 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(
-                MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID", "RefererHash", "URLHash"})),
-                filter_cond),
+            MakeFilter(MakeScan(input_,
+                                S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID", "RefererHash", "URLHash"})),
+                       filter_cond),
             MakeAggregation(
                 {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
                 {GroupByUnit{MakeVariable("URLHash", Type::kInt64), "URLHash"},
@@ -971,9 +967,8 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
             MakeProject(
-                MakeFilter(
-                    MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "DontCountHits", "EventTime"})),
-                    filter_cond),
+                MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "DontCountHits", "EventTime"})),
+                           filter_cond),
                 {ProjectionUnit{MakeUnary(UnaryFunction::kDateTruncMinute, MakeVariable("EventTime", Type::kTimestamp)),
                                 "M"}}),
             MakeAggregation(
@@ -993,7 +988,6 @@ class QueryMaker {
 
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
-  // absl::InitializeLog();
 
   const std::string input = absl::GetFlag(FLAGS_input);
   if (input.empty()) {
@@ -1031,6 +1025,8 @@ int main(int argc, char** argv) {
     auto& q = queries[i];
     LOG(INFO) << "Running " << q.name;
     try {
+      const auto start = std::chrono::steady_clock::now();
+
       const std::filesystem::path out_path = std::filesystem::path(output_dir) / ("q" + std::to_string(i) + ".csv");
       ngn::CsvWriter writer(out_path.string());
       auto stream = ngn::Execute(q.plan);
@@ -1043,6 +1039,10 @@ int main(int argc, char** argv) {
           writer.WriteRow(row);
         }
       }
+
+      const auto end = std::chrono::steady_clock::now();
+      const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+      LOG(INFO) << q.name << " completed in " << elapsed_ms << " ms";
     } catch (const std::exception& e) {
       LOG(ERROR) << q.name << " failed: " << e.what();
     }
