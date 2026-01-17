@@ -12,7 +12,9 @@ namespace ngn {
 enum class ExpressionType {
   kConst,
   kVariable,
+  kUnary,
   kBinary,
+  kLike,
 };
 
 struct Expression {
@@ -35,6 +37,19 @@ struct Variable : public Expression {
 
   std::string name;
   Type type;
+};
+
+enum class UnaryFunction {
+  kNot,
+  kExtractMinute,
+};
+
+struct Unary : public Expression {
+  explicit Unary(UnaryFunction f, std::shared_ptr<Expression> op)
+      : Expression(ExpressionType::kUnary), function(f), operand(std::move(op)) {}
+
+  UnaryFunction function;
+  std::shared_ptr<Expression> operand;
 };
 
 enum class BinaryFunction {
@@ -61,15 +76,32 @@ struct Binary : public Expression {
   std::shared_ptr<Expression> rhs;
 };
 
+struct Like : public Expression {
+  explicit Like(std::shared_ptr<Expression> op, std::string pat, bool neg)
+      : Expression(ExpressionType::kLike), operand(std::move(op)), pattern(std::move(pat)), negated(neg) {}
+
+  std::shared_ptr<Expression> operand;
+  std::string pattern;
+  bool negated;
+};
+
 inline std::shared_ptr<Const> MakeConst(Value value) { return std::make_shared<Const>(std::move(value)); }
 
 inline std::shared_ptr<Variable> MakeVariable(std::string name, Type type) {
   return std::make_shared<Variable>(std::move(name), std::move(type));
 }
 
+inline std::shared_ptr<Unary> MakeUnary(UnaryFunction function, std::shared_ptr<Expression> operand) {
+  return std::make_shared<Unary>(std::move(function), std::move(operand));
+}
+
 inline std::shared_ptr<Binary> MakeBinary(BinaryFunction function, std::shared_ptr<Expression> lhs,
                                           std::shared_ptr<Expression> rhs) {
   return std::make_shared<Binary>(std::move(function), std::move(lhs), std::move(rhs));
+}
+
+inline std::shared_ptr<Like> MakeLike(std::shared_ptr<Expression> operand, std::string pattern, bool negated = false) {
+  return std::make_shared<Like>(std::move(operand), std::move(pattern), negated);
 }
 
 Column Evaluate(std::shared_ptr<Batch> batch, std::shared_ptr<Expression> expression);

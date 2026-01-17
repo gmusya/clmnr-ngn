@@ -302,6 +302,91 @@ class QueryMaker {
     return QueryInfo{.plan = plan, .name = "Q17"};
   }
 
+  QueryInfo MakeQ18() {
+    // SELECT UserID, extract(minute FROM EventTime) AS m, SearchPhrase, COUNT(*) FROM hits GROUP BY UserID, m,
+    // SearchPhrase ORDER BY COUNT(*) DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeProject(
+                MakeScan(input_, schema_),
+                {ProjectionUnit{MakeVariable("UserID", Type::kInt64), "UserID"},
+                 ProjectionUnit{MakeUnary(UnaryFunction::kExtractMinute, MakeVariable("EventTime", Type::kTimestamp)),
+                                "m"},
+                 ProjectionUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}}),
+            MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
+                            {GroupByUnit{MakeVariable("UserID", Type::kInt64), "UserID"},
+                             GroupByUnit{MakeVariable("m", Type::kInt64), "m"},
+                             GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
+        {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q18"};
+  }
+
+  QueryInfo MakeQ19() {
+    // SELECT UserID FROM hits WHERE UserID = 435090932899640449;
+
+    std::shared_ptr<Operator> plan = MakeProject(
+        MakeFilter(MakeScan(input_, schema_), MakeBinary(BinaryFunction::kEqual, MakeVariable("UserID", Type::kInt64),
+                                                         MakeConst(Value(static_cast<int64_t>(435090932899640449LL))))),
+        {ProjectionUnit{MakeVariable("UserID", Type::kInt64), "UserID"}});
+
+    return QueryInfo{.plan = plan, .name = "Q19"};
+  }
+
+  QueryInfo MakeQ20() {
+    // SELECT COUNT(*) FROM hits WHERE URL LIKE '%google%';
+
+    std::shared_ptr<Operator> plan = MakeAggregate(
+        MakeFilter(MakeScan(input_, schema_), MakeLike(MakeVariable("URL", Type::kString), "%google%")),
+        MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
+                        {}));
+
+    return QueryInfo{.plan = plan, .name = "Q20"};
+  }
+
+  QueryInfo MakeQ21() {
+    // SELECT SearchPhrase, MIN(URL), COUNT(*) AS c FROM hits WHERE URL LIKE '%google%' AND SearchPhrase <> '' GROUP BY
+    // SearchPhrase ORDER BY c DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, schema_),
+                       MakeBinary(BinaryFunction::kAnd, MakeLike(MakeVariable("URL", Type::kString), "%google%"),
+                                  MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
+                                             MakeConst(Value(std::string("")))))),
+            MakeAggregation({AggregationUnit{AggregationType::kMin, MakeVariable("URL", Type::kString), "min_url"},
+                             AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
+                            {GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
+        {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q21"};
+  }
+
+  QueryInfo MakeQ22() {
+    // SELECT SearchPhrase, MIN(URL), MIN(Title), COUNT(*) AS c, COUNT(DISTINCT UserID) FROM hits WHERE Title LIKE
+    // '%Google%' AND URL NOT LIKE '%.google.%' AND SearchPhrase <> '' GROUP BY SearchPhrase ORDER BY c DESC LIMIT 10;
+
+    std::shared_ptr<Operator> plan = MakeTopK(
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, schema_),
+                       MakeBinary(BinaryFunction::kAnd,
+                                  MakeBinary(BinaryFunction::kAnd,
+                                             MakeLike(MakeVariable("Title", Type::kString), "%Google%"),
+                                             MakeLike(MakeVariable("URL", Type::kString), "%.google.%", true)),
+                                  MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
+                                             MakeConst(Value(std::string("")))))),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kMin, MakeVariable("URL", Type::kString), "min_url"},
+                 AggregationUnit{AggregationType::kMin, MakeVariable("Title", Type::kString), "min_title"},
+                 AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"},
+                 AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "distinct_u"}},
+                {GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
+        {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
+
+    return QueryInfo{.plan = plan, .name = "Q22"};
+  }
+
  private:
   std::string input_;
   ngn::Schema schema_;
@@ -338,7 +423,8 @@ int main(int argc, char** argv) {
       query_maker.MakeQ0(),  query_maker.MakeQ1(),  query_maker.MakeQ2(),  query_maker.MakeQ3(),  query_maker.MakeQ4(),
       query_maker.MakeQ5(),  query_maker.MakeQ6(),  query_maker.MakeQ7(),  query_maker.MakeQ8(),  query_maker.MakeQ9(),
       query_maker.MakeQ10(), query_maker.MakeQ11(), query_maker.MakeQ12(), query_maker.MakeQ13(), query_maker.MakeQ14(),
-      query_maker.MakeQ15(), query_maker.MakeQ16(), query_maker.MakeQ17()};
+      query_maker.MakeQ15(), query_maker.MakeQ16(), query_maker.MakeQ17(), query_maker.MakeQ18(), query_maker.MakeQ19(),
+      query_maker.MakeQ20(), query_maker.MakeQ21(), query_maker.MakeQ22()};
 
   for (size_t i = 0; i < queries.size(); ++i) {
     auto& q = queries[i];

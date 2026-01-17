@@ -80,6 +80,24 @@ Column EvaluateBinary(std::shared_ptr<Batch> batch, std::shared_ptr<Binary> expr
   }
 }
 
+Column EvaluateUnary(std::shared_ptr<Batch> batch, std::shared_ptr<Unary> expression) {
+  Column operand = Evaluate(batch, expression->operand);
+
+  switch (expression->function) {
+    case UnaryFunction::kNot:
+      return Not(operand);
+    case UnaryFunction::kExtractMinute:
+      return ExtractMinute(operand);
+    default:
+      THROW_NOT_IMPLEMENTED;
+  }
+}
+
+Column EvaluateLike(std::shared_ptr<Batch> batch, std::shared_ptr<Like> expression) {
+  Column operand = Evaluate(batch, expression->operand);
+  return LikeMatch(operand, expression->pattern, expression->negated);
+}
+
 }  // namespace
 
 Column Evaluate(std::shared_ptr<Batch> batch, std::shared_ptr<Expression> expression) {
@@ -88,8 +106,12 @@ Column Evaluate(std::shared_ptr<Batch> batch, std::shared_ptr<Expression> expres
       return EvaluateConst(batch->Rows(), std::static_pointer_cast<Const>(expression));
     case ExpressionType::kVariable:
       return EvaluateVariable(batch, std::static_pointer_cast<Variable>(expression));
+    case ExpressionType::kUnary:
+      return EvaluateUnary(batch, std::static_pointer_cast<Unary>(expression));
     case ExpressionType::kBinary:
       return EvaluateBinary(batch, std::static_pointer_cast<Binary>(expression));
+    case ExpressionType::kLike:
+      return EvaluateLike(batch, std::static_pointer_cast<Like>(expression));
     default:
       THROW_NOT_IMPLEMENTED;
   }

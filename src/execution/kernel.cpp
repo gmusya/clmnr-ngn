@@ -1,5 +1,8 @@
 #include "src/execution/kernel.h"
 
+#include <functional>
+
+#include "src/core/type.h"
 #include "src/util/assert.h"
 #include "src/util/macro.h"
 
@@ -107,15 +110,45 @@ ArrayType<Type::kInt128> Div(const ArrayType<Type::kInt64>& lhs, const ArrayType
   return result;
 }
 
-template <Type type>
-ArrayType<Type::kBool> NotEqual(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
+template <Type type, typename Comparator>
+ArrayType<Type::kBool> Compare(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
   ASSERT(lhs.size() == rhs.size());
 
   ArrayType<Type::kBool> result(lhs.size());
   for (size_t i = 0; i < lhs.size(); ++i) {
-    result[i] = Boolean{lhs[i] != rhs[i]};
+    result[i] = Boolean{Comparator{}(lhs[i], rhs[i])};
   }
   return result;
+}
+
+template <Type type>
+ArrayType<Type::kBool> NotEqual(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
+  return Compare<type, std::not_equal_to<PhysicalType<type>>>(lhs, rhs);
+}
+
+template <Type type>
+ArrayType<Type::kBool> Equal(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
+  return Compare<type, std::equal_to<PhysicalType<type>>>(lhs, rhs);
+}
+
+template <Type type>
+ArrayType<Type::kBool> Less(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
+  return Compare<type, std::less<PhysicalType<type>>>(lhs, rhs);
+}
+
+template <Type type>
+ArrayType<Type::kBool> LessOrEqual(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
+  return Compare<type, std::less_equal<PhysicalType<type>>>(lhs, rhs);
+}
+
+template <Type type>
+ArrayType<Type::kBool> Greater(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
+  return Compare<type, std::greater<PhysicalType<type>>>(lhs, rhs);
+}
+
+template <Type type>
+ArrayType<Type::kBool> GreaterOrEqual(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
+  return Compare<type, std::greater_equal<PhysicalType<type>>>(lhs, rhs);
 }
 
 }  // namespace internal
@@ -181,26 +214,59 @@ Column Div(const Column& lhs, const Column& rhs) {
 
 Column And(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
 Column Or(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
-Column Less(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
-Column Greater(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
-Column Equal(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
-Column NotEqual(const Column& lhs, const Column& rhs) {
-  ASSERT(lhs.GetType() == rhs.GetType());
 
-  if (lhs.GetType() == Type::kInt16) {
-    return Column(internal::NotEqual(std::get<ArrayType<Type::kInt16>>(lhs.Values()),
-                                     std::get<ArrayType<Type::kInt16>>(rhs.Values())));
-  }
-
-  if (lhs.GetType() == Type::kString) {
-    return Column(internal::NotEqual(std::get<ArrayType<Type::kString>>(lhs.Values()),
-                                     std::get<ArrayType<Type::kString>>(rhs.Values())));
-  }
-
-  THROW_NOT_IMPLEMENTED;
+Column Less(const Column& lhs, const Column& rhs) {
+  return Column(Dispatch(
+      [&]<Type type>(Tag<type>) {
+        return internal::Less(std::get<ArrayType<type>>(lhs.Values()), std::get<ArrayType<type>>(rhs.Values()));
+      },
+      lhs.GetType()));
 }
 
-Column LessOrEqual(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
-Column GreaterOrEqual(const Column&, const Column&) { THROW_NOT_IMPLEMENTED; }
+Column Greater(const Column& lhs, const Column& rhs) {
+  return Column(Dispatch(
+      [&]<Type type>(Tag<type>) {
+        return internal::Greater(std::get<ArrayType<type>>(lhs.Values()), std::get<ArrayType<type>>(rhs.Values()));
+      },
+      lhs.GetType()));
+}
+
+Column Equal(const Column& lhs, const Column& rhs) {
+  return Column(Dispatch(
+      [&]<Type type>(Tag<type>) {
+        return internal::Equal(std::get<ArrayType<type>>(lhs.Values()), std::get<ArrayType<type>>(rhs.Values()));
+      },
+      lhs.GetType()));
+}
+
+Column NotEqual(const Column& lhs, const Column& rhs) {
+  return Column(Dispatch(
+      [&]<Type type>(Tag<type>) {
+        return internal::NotEqual(std::get<ArrayType<type>>(lhs.Values()), std::get<ArrayType<type>>(rhs.Values()));
+      },
+      lhs.GetType()));
+}
+
+Column LessOrEqual(const Column& lhs, const Column& rhs) {
+  return Column(Dispatch(
+      [&]<Type type>(Tag<type>) {
+        return internal::LessOrEqual(std::get<ArrayType<type>>(lhs.Values()), std::get<ArrayType<type>>(rhs.Values()));
+      },
+      lhs.GetType()));
+}
+
+Column GreaterOrEqual(const Column& lhs, const Column& rhs) {
+  return Column(Dispatch(
+      [&]<Type type>(Tag<type>) {
+        return internal::GreaterOrEqual(std::get<ArrayType<type>>(lhs.Values()),
+                                        std::get<ArrayType<type>>(rhs.Values()));
+      },
+      lhs.GetType()));
+}
+
+Column LikeMatch(const Column&, const std::string&, bool) { THROW_NOT_IMPLEMENTED; }
+
+Column Not(const Column&) { THROW_NOT_IMPLEMENTED; }
+Column ExtractMinute(const Column&) { THROW_NOT_IMPLEMENTED; }
 
 }  // namespace ngn

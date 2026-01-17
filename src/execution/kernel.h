@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "src/core/column.h"
 
 namespace ngn {
@@ -17,5 +19,10 @@ Column Equal(const Column& lhs, const Column& rhs);
 Column NotEqual(const Column& lhs, const Column& rhs);
 Column LessOrEqual(const Column& lhs, const Column& rhs);
 Column GreaterOrEqual(const Column& lhs, const Column& rhs);
+Column LikeMatch(const Column& operand, const std::string& pattern, bool negated);
+
+// Unary operations
+Column Not(const Column& operand);
+Column ExtractMinute(const Column& operand);
 
 }  // namespace ngn
