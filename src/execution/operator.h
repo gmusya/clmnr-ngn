@@ -92,8 +92,8 @@ struct SortOperator : public Operator {
 };
 
 struct TopKOperator : public Operator {
-  TopKOperator(std::shared_ptr<Operator> chi, std::vector<SortUnit> sk, uint32_t lim)
-      : Operator(OperatorType::kTopK), child(std::move(chi)), sort_keys(std::move(sk)), limit(lim) {
+  TopKOperator(std::shared_ptr<Operator> chi, std::vector<SortUnit> sk, uint32_t lim, uint32_t off = 0)
+      : Operator(OperatorType::kTopK), child(std::move(chi)), sort_keys(std::move(sk)), limit(lim), offset(off) {
     ASSERT(child != nullptr);
     ASSERT(!sort_keys.empty());
   }
@@ -101,6 +101,7 @@ struct TopKOperator : public Operator {
   std::shared_ptr<Operator> child;
   std::vector<SortUnit> sort_keys;
   uint32_t limit;
+  uint32_t offset;
 };
 
 #if 0
@@ -140,8 +141,8 @@ inline std::shared_ptr<SortOperator> MakeSort(std::shared_ptr<Operator> child, s
 }
 
 inline std::shared_ptr<TopKOperator> MakeTopK(std::shared_ptr<Operator> child, std::vector<SortUnit> sort_keys,
-                                              uint32_t limit) {
-  return std::make_shared<TopKOperator>(std::move(child), std::move(sort_keys), limit);
+                                              uint32_t limit, uint32_t offset = 0) {
+  return std::make_shared<TopKOperator>(std::move(child), std::move(sort_keys), limit, offset);
 }
 
 #if 0
