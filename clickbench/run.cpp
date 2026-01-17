@@ -30,11 +30,25 @@ class QueryMaker {
  public:
   QueryMaker(std::string input, ngn::Schema schema) : input_(std::move(input)), schema_(std::move(schema)) {}
 
+  // Helper to build schema from column names
+  Schema S(std::initializer_list<std::string> names) {
+    std::vector<Field> fields;
+    for (const auto& name : names) {
+      for (const auto& f : schema_.Fields()) {
+        if (f.name == name) {
+          fields.push_back(f);
+          break;
+        }
+      }
+    }
+    return Schema(std::move(fields));
+  }
+
   QueryInfo MakeQ0() {
     // SELECT COUNT(*) FROM hits;
 
     std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeScan(input_, schema_),
+        MakeScan(input_, Schema({})),
         MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
                         {}));
 
@@ -45,7 +59,7 @@ class QueryMaker {
     // SELECT COUNT(*) FROM hits WHERE AdvEngineID <> 0;
 
     std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeFilter(MakeScan(input_, schema_),
+        MakeFilter(MakeScan(input_, S({"AdvEngineID"})),
                    MakeBinary(BinaryFunction::kNotEqual, MakeVariable("AdvEngineID", Type::kInt16),
                               MakeConst(Value(static_cast<int16_t>(0))))),
         MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
@@ -59,7 +73,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeProject(
         MakeAggregate(
-            MakeScan(input_, schema_),
+            MakeScan(input_, S({"AdvEngineID", "ResolutionWidth"})),
             MakeAggregation(
                 {AggregationUnit{AggregationType::kSum, MakeVariable("AdvEngineID", Type::kInt16), "sum"},
                  AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"},
@@ -79,7 +93,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeProject(
         MakeAggregate(
-            MakeScan(input_, schema_),
+            MakeScan(input_, S({"UserID"})),
             MakeAggregation(
                 {AggregationUnit{AggregationType::kSum, MakeVariable("UserID", Type::kInt64), "sum"},
                  AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
@@ -95,7 +109,7 @@ class QueryMaker {
     // SELECT COUNT(DISTINCT UserID) FROM hits;
 
     std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeScan(input_, schema_),
+        MakeScan(input_, S({"UserID"})),
         MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "distinct"}},
                         {}));
 
@@ -106,7 +120,7 @@ class QueryMaker {
     // SELECT COUNT(DISTINCT SearchPhrase) FROM hits;
 
     std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeScan(input_, schema_),
+        MakeScan(input_, S({"SearchPhrase"})),
         MakeAggregation(
             {AggregationUnit{AggregationType::kDistinct, MakeVariable("SearchPhrase", Type::kString), "distinct"}},
             {}));
@@ -118,7 +132,7 @@ class QueryMaker {
     // SELECT MIN(EventDate), MAX(EventDate) FROM hits;
 
     std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeScan(input_, schema_),
+        MakeScan(input_, S({"EventDate"})),
         MakeAggregation({AggregationUnit{AggregationType::kMin, MakeVariable("EventDate", Type::kDate), "min"},
                          AggregationUnit{AggregationType::kMax, MakeVariable("EventDate", Type::kDate), "max"}},
                         {}));
@@ -130,7 +144,7 @@ class QueryMaker {
     // SELECT AdvEngineID, COUNT(*) FROM hits WHERE AdvEngineID <> 0 GROUP BY AdvEngineID ORDER BY COUNT(*) DESC;
 
     std::shared_ptr<Operator> plan = MakeSort(
-        MakeAggregate(MakeFilter(MakeScan(input_, schema_),
+        MakeAggregate(MakeFilter(MakeScan(input_, S({"AdvEngineID"})),
                                  MakeBinary(BinaryFunction::kNotEqual, MakeVariable("AdvEngineID", Type::kInt16),
                                             MakeConst(Value(static_cast<int16_t>(0))))),
                       MakeAggregation({AggregationUnit{AggregationType::kCount,
@@ -146,7 +160,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeScan(input_, schema_),
+            MakeScan(input_, S({"RegionID", "UserID"})),
             MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "u"}},
                             {GroupByUnit{MakeVariable("RegionID", Type::kInt32), "RegionID"}})),
         {SortUnit{MakeVariable("u", Type::kInt64), false}}, 10);
@@ -161,7 +175,7 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeProject(
         MakeTopK(
             MakeAggregate(
-                MakeScan(input_, schema_),
+                MakeScan(input_, S({"RegionID", "AdvEngineID", "ResolutionWidth", "UserID"})),
                 MakeAggregation(
                     {AggregationUnit{AggregationType::kSum, MakeVariable("AdvEngineID", Type::kInt16), "sum_adv"},
                      AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"},
@@ -186,7 +200,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_, schema_),
+            MakeFilter(MakeScan(input_, S({"MobilePhoneModel", "UserID"})),
                        MakeBinary(BinaryFunction::kNotEqual, MakeVariable("MobilePhoneModel", Type::kString),
                                   MakeConst(Value(std::string(""))))),
             MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "u"}},
@@ -202,7 +216,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_, schema_),
+            MakeFilter(MakeScan(input_, S({"MobilePhone", "MobilePhoneModel", "UserID"})),
                        MakeBinary(BinaryFunction::kNotEqual, MakeVariable("MobilePhoneModel", Type::kString),
                                   MakeConst(Value(std::string(""))))),
             MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "u"}},
@@ -219,7 +233,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_, schema_),
+            MakeFilter(MakeScan(input_, S({"SearchPhrase"})),
                        MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
                                   MakeConst(Value(std::string(""))))),
             MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
@@ -235,7 +249,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_, schema_),
+            MakeFilter(MakeScan(input_, S({"SearchPhrase", "UserID"})),
                        MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
                                   MakeConst(Value(std::string(""))))),
             MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "u"}},
@@ -251,7 +265,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_, schema_),
+            MakeFilter(MakeScan(input_, S({"SearchEngineID", "SearchPhrase"})),
                        MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
                                   MakeConst(Value(std::string(""))))),
             MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
@@ -267,7 +281,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeScan(input_, schema_),
+            MakeScan(input_, S({"UserID"})),
             MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
                             {GroupByUnit{MakeVariable("UserID", Type::kInt64), "UserID"}})),
         {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
@@ -280,7 +294,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeScan(input_, schema_),
+            MakeScan(input_, S({"UserID", "SearchPhrase"})),
             MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
                             {GroupByUnit{MakeVariable("UserID", Type::kInt64), "UserID"},
                              GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
@@ -294,7 +308,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeScan(input_, schema_),
+            MakeScan(input_, S({"UserID", "SearchPhrase"})),
             MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
                             {GroupByUnit{MakeVariable("UserID", Type::kInt64), "UserID"},
                              GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
@@ -310,7 +324,7 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
             MakeProject(
-                MakeScan(input_, schema_),
+                MakeScan(input_, S({"UserID", "EventTime", "SearchPhrase"})),
                 {ProjectionUnit{MakeVariable("UserID", Type::kInt64), "UserID"},
                  ProjectionUnit{MakeUnary(UnaryFunction::kExtractMinute, MakeVariable("EventTime", Type::kTimestamp)),
                                 "m"},
@@ -328,8 +342,9 @@ class QueryMaker {
     // SELECT UserID FROM hits WHERE UserID = 435090932899640449;
 
     std::shared_ptr<Operator> plan = MakeProject(
-        MakeFilter(MakeScan(input_, schema_), MakeBinary(BinaryFunction::kEqual, MakeVariable("UserID", Type::kInt64),
-                                                         MakeConst(Value(static_cast<int64_t>(435090932899640449LL))))),
+        MakeFilter(MakeScan(input_, S({"UserID"})),
+                   MakeBinary(BinaryFunction::kEqual, MakeVariable("UserID", Type::kInt64),
+                              MakeConst(Value(static_cast<int64_t>(435090932899640449LL))))),
         {ProjectionUnit{MakeVariable("UserID", Type::kInt64), "UserID"}});
 
     return QueryInfo{.plan = plan, .name = "Q19"};
@@ -339,7 +354,7 @@ class QueryMaker {
     // SELECT COUNT(*) FROM hits WHERE URL LIKE '%google%';
 
     std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeFilter(MakeScan(input_, schema_), MakeLike(MakeVariable("URL", Type::kString), "%google%")),
+        MakeFilter(MakeScan(input_, S({"URL"})), MakeLike(MakeVariable("URL", Type::kString), "%google%")),
         MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
                         {}));
 
@@ -352,7 +367,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_, schema_),
+            MakeFilter(MakeScan(input_, S({"URL", "SearchPhrase"})),
                        MakeBinary(BinaryFunction::kAnd, MakeLike(MakeVariable("URL", Type::kString), "%google%"),
                                   MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
                                              MakeConst(Value(std::string("")))))),
@@ -371,7 +386,7 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
             MakeFilter(
-                MakeScan(input_, schema_),
+                MakeScan(input_, S({"Title", "URL", "SearchPhrase", "UserID"})),
                 MakeBinary(BinaryFunction::kAnd,
                            MakeBinary(BinaryFunction::kAnd, MakeLike(MakeVariable("Title", Type::kString), "%Google%"),
                                       MakeLike(MakeVariable("URL", Type::kString), "%.google.%", true)),
@@ -393,11 +408,13 @@ class QueryMaker {
     // Note: projecting subset of columns for demonstration
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeProject(MakeFilter(MakeScan(input_, schema_), MakeLike(MakeVariable("URL", Type::kString), "%google%")),
-                    {ProjectionUnit{MakeVariable("WatchID", Type::kInt64), "WatchID"},
-                     ProjectionUnit{MakeVariable("EventTime", Type::kTimestamp), "EventTime"},
-                     ProjectionUnit{MakeVariable("URL", Type::kString), "URL"},
-                     ProjectionUnit{MakeVariable("Title", Type::kString), "Title"}}),
+        MakeProject(
+            MakeFilter(MakeScan(input_, S({"WatchID", "EventTime", "URL", "Title"})),
+                       MakeLike(MakeVariable("URL", Type::kString), "%google%")),
+            {ProjectionUnit{MakeVariable("WatchID", Type::kInt64), "WatchID"},
+             ProjectionUnit{MakeVariable("EventTime", Type::kTimestamp), "EventTime"},
+             ProjectionUnit{MakeVariable("URL", Type::kString), "URL"},
+             ProjectionUnit{MakeVariable("Title", Type::kString), "Title"}}),
         {SortUnit{MakeVariable("EventTime", Type::kTimestamp), true}}, 10);
 
     return QueryInfo{.plan = plan, .name = "Q23"};
@@ -407,7 +424,7 @@ class QueryMaker {
     // SELECT SearchPhrase FROM hits WHERE SearchPhrase <> '' ORDER BY EventTime LIMIT 10;
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeProject(MakeFilter(MakeScan(input_, schema_),
+        MakeProject(MakeFilter(MakeScan(input_, S({"SearchPhrase", "EventTime"})),
                                MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
                                           MakeConst(Value(std::string(""))))),
                     {ProjectionUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"},
@@ -421,7 +438,7 @@ class QueryMaker {
     // SELECT SearchPhrase FROM hits WHERE SearchPhrase <> '' ORDER BY SearchPhrase LIMIT 10;
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeProject(MakeFilter(MakeScan(input_, schema_),
+        MakeProject(MakeFilter(MakeScan(input_, S({"SearchPhrase"})),
                                MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
                                           MakeConst(Value(std::string(""))))),
                     {ProjectionUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}}),
@@ -434,7 +451,7 @@ class QueryMaker {
     // SELECT SearchPhrase FROM hits WHERE SearchPhrase <> '' ORDER BY EventTime, SearchPhrase LIMIT 10;
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeProject(MakeFilter(MakeScan(input_, schema_),
+        MakeProject(MakeFilter(MakeScan(input_, S({"SearchPhrase", "EventTime"})),
                                MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
                                           MakeConst(Value(std::string(""))))),
                     {ProjectionUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"},
@@ -454,7 +471,7 @@ class QueryMaker {
         MakeProject(
             MakeFilter(
                 MakeAggregate(
-                    MakeProject(MakeFilter(MakeScan(input_, schema_),
+                    MakeProject(MakeFilter(MakeScan(input_, S({"CounterID", "URL"})),
                                            MakeBinary(BinaryFunction::kNotEqual, MakeVariable("URL", Type::kString),
                                                       MakeConst(Value(std::string(""))))),
                                 {ProjectionUnit{MakeVariable("CounterID", Type::kInt32), "CounterID"},
@@ -485,7 +502,7 @@ class QueryMaker {
             MakeFilter(
                 MakeAggregate(
                     MakeProject(
-                        MakeFilter(MakeScan(input_, schema_),
+                        MakeFilter(MakeScan(input_, S({"Referer"})),
                                    MakeBinary(BinaryFunction::kNotEqual, MakeVariable("Referer", Type::kString),
                                               MakeConst(Value(std::string(""))))),
                         {ProjectionUnit{MakeRegexReplace(MakeVariable("Referer", Type::kString),
@@ -531,8 +548,9 @@ class QueryMaker {
       aggregations.push_back(AggregationUnit{AggregationType::kSum, MakeVariable(col_name, Type::kInt16), col_name});
     }
 
-    std::shared_ptr<Operator> plan = MakeAggregate(MakeProject(MakeScan(input_, schema_), std::move(projections)),
-                                                   MakeAggregation(std::move(aggregations), {}));
+    std::shared_ptr<Operator> plan = MakeAggregate(
+        MakeProject(MakeScan(input_, S({"ResolutionWidth"})), std::move(projections)),
+        MakeAggregation(std::move(aggregations), {}));
 
     return QueryInfo{.plan = plan, .name = "Q29"};
   }
@@ -544,7 +562,8 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeProject(
             MakeAggregate(
-                MakeFilter(MakeScan(input_, schema_),
+                MakeFilter(MakeScan(input_, S({"SearchPhrase", "SearchEngineID", "ClientIP", "IsRefresh",
+                                               "ResolutionWidth"})),
                            MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
                                       MakeConst(Value(std::string(""))))),
                 MakeAggregation(
@@ -573,9 +592,10 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeProject(
             MakeAggregate(
-                MakeFilter(MakeScan(input_, schema_),
-                           MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
-                                      MakeConst(Value(std::string(""))))),
+                MakeFilter(
+                    MakeScan(input_, S({"SearchPhrase", "WatchID", "ClientIP", "IsRefresh", "ResolutionWidth"})),
+                    MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
+                               MakeConst(Value(std::string(""))))),
                 MakeAggregation(
                     {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"},
                      AggregationUnit{AggregationType::kSum, MakeVariable("IsRefresh", Type::kInt16), "sum_refresh"},
@@ -602,7 +622,7 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeProject(
             MakeAggregate(
-                MakeScan(input_, schema_),
+                MakeScan(input_, S({"WatchID", "ClientIP", "IsRefresh", "ResolutionWidth"})),
                 MakeAggregation(
                     {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"},
                      AggregationUnit{AggregationType::kSum, MakeVariable("IsRefresh", Type::kInt16), "sum_refresh"},
@@ -627,7 +647,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeScan(input_, schema_),
+            MakeScan(input_, S({"URL"})),
             MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
                             {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
         {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
@@ -639,7 +659,7 @@ class QueryMaker {
     // SELECT 1, URL, COUNT(*) AS c FROM hits GROUP BY 1, URL ORDER BY c DESC LIMIT 10;
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeProject(MakeAggregate(MakeScan(input_, schema_),
+        MakeProject(MakeAggregate(MakeScan(input_, S({"URL"})),
                                   MakeAggregation({AggregationUnit{AggregationType::kCount,
                                                                    MakeConst(Value(static_cast<int64_t>(0))), "c"}},
                                                   {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
@@ -658,7 +678,7 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeProject(
             MakeAggregate(
-                MakeProject(MakeScan(input_, schema_),
+                MakeProject(MakeScan(input_, S({"ClientIP"})),
                             {ProjectionUnit{MakeVariable("ClientIP", Type::kInt32), "ClientIP"},
                              ProjectionUnit{MakeBinary(BinaryFunction::kSub, MakeVariable("ClientIP", Type::kInt32),
                                                        MakeConst(Value(static_cast<int32_t>(1)))),
@@ -689,7 +709,6 @@ class QueryMaker {
     // SELECT URL, COUNT(*) AS PageViews FROM hits WHERE CounterID = 62 AND EventDate >= '2013-07-01' AND EventDate <=
     // '2013-07-31' AND DontCountHits = 0 AND IsRefresh = 0 AND URL <> '' GROUP BY URL ORDER BY PageViews DESC LIMIT 10;
 
-    // EventDate is stored as int32 days since epoch. 2013-07-01 = 15887, 2013-07-31 = 15917
     auto filter_cond = MakeBinary(
         BinaryFunction::kAnd,
         MakeBinary(
@@ -711,10 +730,12 @@ class QueryMaker {
         MakeBinary(BinaryFunction::kNotEqual, MakeVariable("URL", Type::kString), MakeConst(Value(std::string("")))));
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(MakeFilter(MakeScan(input_, schema_), filter_cond),
-                      MakeAggregation({AggregationUnit{AggregationType::kCount,
-                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                                      {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "URL"})),
+                       filter_cond),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10);
 
     return QueryInfo{.plan = plan, .name = "Q36"};
@@ -746,10 +767,12 @@ class QueryMaker {
         MakeBinary(BinaryFunction::kNotEqual, MakeVariable("Title", Type::kString), MakeConst(Value(std::string("")))));
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(MakeFilter(MakeScan(input_, schema_), filter_cond),
-                      MakeAggregation({AggregationUnit{AggregationType::kCount,
-                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                                      {GroupByUnit{MakeVariable("Title", Type::kString), "Title"}})),
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "Title"})),
+                       filter_cond),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                {GroupByUnit{MakeVariable("Title", Type::kString), "Title"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10);
 
     return QueryInfo{.plan = plan, .name = "Q37"};
@@ -782,10 +805,12 @@ class QueryMaker {
                    MakeConst(Value(static_cast<int16_t>(0)))));
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(MakeFilter(MakeScan(input_, schema_), filter_cond),
-                      MakeAggregation({AggregationUnit{AggregationType::kCount,
-                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                                      {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "IsLink", "IsDownload", "URL"})),
+                       filter_cond),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10, 1000);
 
     return QueryInfo{.plan = plan, .name = "Q38"};
@@ -817,21 +842,25 @@ class QueryMaker {
                                                 MakeConst(Value(static_cast<int16_t>(0)))));
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(MakeProject(MakeFilter(MakeScan(input_, schema_), filter_cond),
-                                  {ProjectionUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
-                                   ProjectionUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
-                                   ProjectionUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
-                                   ProjectionUnit{MakeCase(case_condition, MakeVariable("Referer", Type::kString),
-                                                           MakeConst(Value(std::string("")))),
-                                                  "Src"},
-                                   ProjectionUnit{MakeVariable("URL", Type::kString), "Dst"}}),
-                      MakeAggregation({AggregationUnit{AggregationType::kCount,
-                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                                      {GroupByUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
-                                       GroupByUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
-                                       GroupByUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
-                                       GroupByUnit{MakeVariable("Src", Type::kString), "Src"},
-                                       GroupByUnit{MakeVariable("Dst", Type::kString), "Dst"}})),
+        MakeAggregate(
+            MakeProject(
+                MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID", "SearchEngineID",
+                                               "AdvEngineID", "Referer", "URL"})),
+                           filter_cond),
+                {ProjectionUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
+                 ProjectionUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
+                 ProjectionUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
+                 ProjectionUnit{MakeCase(case_condition, MakeVariable("Referer", Type::kString),
+                                         MakeConst(Value(std::string("")))),
+                                "Src"},
+                 ProjectionUnit{MakeVariable("URL", Type::kString), "Dst"}}),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                {GroupByUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
+                 GroupByUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
+                 GroupByUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
+                 GroupByUnit{MakeVariable("Src", Type::kString), "Src"},
+                 GroupByUnit{MakeVariable("Dst", Type::kString), "Dst"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10, 1000);
 
     return QueryInfo{.plan = plan, .name = "Q39"};
@@ -864,11 +893,14 @@ class QueryMaker {
                    MakeConst(Value(static_cast<int64_t>(3594120000172545465LL)))));
 
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(MakeFilter(MakeScan(input_, schema_), filter_cond),
-                      MakeAggregation({AggregationUnit{AggregationType::kCount,
-                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                                      {GroupByUnit{MakeVariable("URLHash", Type::kInt64), "URLHash"},
-                                       GroupByUnit{MakeVariable("EventDate", Type::kDate), "EventDate"}})),
+        MakeAggregate(
+            MakeFilter(
+                MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID", "RefererHash", "URLHash"})),
+                filter_cond),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                {GroupByUnit{MakeVariable("URLHash", Type::kInt64), "URLHash"},
+                 GroupByUnit{MakeVariable("EventDate", Type::kDate), "EventDate"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10, 100);
 
     return QueryInfo{.plan = plan, .name = "Q40"};
@@ -902,7 +934,9 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_, schema_), filter_cond),
+            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "DontCountHits", "URLHash",
+                                           "WindowClientWidth", "WindowClientHeight"})),
+                       filter_cond),
             MakeAggregation(
                 {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
                 {GroupByUnit{MakeVariable("WindowClientWidth", Type::kInt16), "WindowClientWidth"},
@@ -917,7 +951,6 @@ class QueryMaker {
     // >= '2013-07-14' AND EventDate <= '2013-07-15' AND IsRefresh = 0 AND DontCountHits = 0 GROUP BY
     // DATE_TRUNC('minute', EventTime) ORDER BY DATE_TRUNC('minute', EventTime) LIMIT 10 OFFSET 1000;
 
-    // EventDate 2013-07-14 = 15900, 2013-07-15 = 15901
     auto filter_cond = MakeBinary(
         BinaryFunction::kAnd,
         MakeBinary(
@@ -938,7 +971,9 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
             MakeProject(
-                MakeFilter(MakeScan(input_, schema_), filter_cond),
+                MakeFilter(
+                    MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "DontCountHits", "EventTime"})),
+                    filter_cond),
                 {ProjectionUnit{MakeUnary(UnaryFunction::kDateTruncMinute, MakeVariable("EventTime", Type::kTimestamp)),
                                 "M"}}),
             MakeAggregation(
@@ -958,7 +993,7 @@ class QueryMaker {
 
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
-  absl::InitializeLog();
+  // absl::InitializeLog();
 
   const std::string input = absl::GetFlag(FLAGS_input);
   if (input.empty()) {
