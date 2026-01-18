@@ -139,28 +139,32 @@ ArrayType<Type::kBool> GreaterOrEqual(const ArrayType<type>& lhs, const ArrayTyp
 
 Column Add(const Column& lhs, const Column& rhs) {
   ASSERT(lhs.GetType() == rhs.GetType());
-  if (lhs.GetType() == Type::kInt64) {
-    return Column(internal::Add(std::get<ArrayType<Type::kInt64>>(lhs.Values()),
-                                std::get<ArrayType<Type::kInt64>>(rhs.Values())));
-  }
-  if (lhs.GetType() == Type::kInt128) {
-    return Column(internal::Add(std::get<ArrayType<Type::kInt128>>(lhs.Values()),
-                                std::get<ArrayType<Type::kInt128>>(rhs.Values())));
-  }
-  THROW_NOT_IMPLEMENTED;
+
+  return Dispatch(
+      [&]<Type type>(Tag<type>) -> Column {
+        if constexpr (type == Type::kInt16 || type == Type::kInt32 || type == Type::kInt64 || type == Type::kInt128) {
+          return Column(
+              internal::Add(std::get<ArrayType<type>>(lhs.Values()), std::get<ArrayType<type>>(rhs.Values())));
+        } else {
+          THROW_NOT_IMPLEMENTED;
+        }
+      },
+      lhs.GetType());
 }
 
 Column Sub(const Column& lhs, const Column& rhs) {
   ASSERT(lhs.GetType() == rhs.GetType());
-  if (lhs.GetType() == Type::kInt64) {
-    return Column(internal::Sub(std::get<ArrayType<Type::kInt64>>(lhs.Values()),
-                                std::get<ArrayType<Type::kInt64>>(rhs.Values())));
-  }
-  if (lhs.GetType() == Type::kInt128) {
-    return Column(internal::Sub(std::get<ArrayType<Type::kInt128>>(lhs.Values()),
-                                std::get<ArrayType<Type::kInt128>>(rhs.Values())));
-  }
-  THROW_NOT_IMPLEMENTED;
+
+  return Dispatch(
+      [&]<Type type>(Tag<type>) -> Column {
+        if constexpr (type == Type::kInt16 || type == Type::kInt32 || type == Type::kInt64 || type == Type::kInt128) {
+          return Column(
+              internal::Sub(std::get<ArrayType<type>>(lhs.Values()), std::get<ArrayType<type>>(rhs.Values())));
+        } else {
+          THROW_NOT_IMPLEMENTED;
+        }
+      },
+      lhs.GetType());
 }
 
 Column Mult(const Column& lhs, const Column& rhs) {
