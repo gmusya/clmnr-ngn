@@ -1,6 +1,7 @@
 #include "src/execution/kernel.h"
 
 #include <functional>
+#include <regex>
 
 #include "src/core/type.h"
 #include "src/util/assert.h"
@@ -334,6 +335,19 @@ Column DateTruncMinute(const Column& operand) {
       --minutes;  // Adjust for negative timestamps to get floor behavior
     }
     result[i] = Timestamp{minutes * kMicrosecondsPerMinute};
+  }
+  return Column(std::move(result));
+}
+
+Column StrRegexReplace(const Column& operand, const std::string& pattern, const std::string& replacement) {
+  ASSERT(operand.GetType() == Type::kString);
+  const auto& values = std::get<ArrayType<Type::kString>>(operand.Values());
+
+  std::regex re(pattern);
+
+  ArrayType<Type::kString> result(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    result[i] = std::regex_replace(values[i], re, replacement);
   }
   return Column(std::move(result));
 }

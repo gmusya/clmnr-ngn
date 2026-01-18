@@ -119,20 +119,22 @@ class MinMaxState : public IState {
 
   void Update(const Value& value) override {
     if (result_value_.has_value()) {
-      if (auto ptr = std::get_if<PhysicalType<Type::kDate>>(&value.GetValue()); ptr != nullptr) {
-        const auto& current_value = std::get<PhysicalType<Type::kDate>>(result_value_->GetValue());
-        if constexpr (is_min) {
-          if (*ptr < current_value) {
-            result_value_ = Value(*ptr);
-          }
-        } else {
-          if (*ptr > current_value) {
-            result_value_ = Value(*ptr);
-          }
-        }
-      } else {
-        THROW_NOT_IMPLEMENTED;
-      }
+      Dispatch(
+          [&]<Type type>(Tag<type>) {
+            const auto& current_value = std::get<PhysicalType<type>>(result_value_->GetValue());
+            const auto& candidate_value = std::get<PhysicalType<type>>(value.GetValue());
+
+            if constexpr (is_min) {
+              if (candidate_value < current_value) {
+                result_value_ = Value(candidate_value);
+              }
+            } else {
+              if (candidate_value > current_value) {
+                result_value_ = Value(candidate_value);
+              }
+            }
+          },
+          value.GetType());
     } else {
       result_value_ = value;
     }

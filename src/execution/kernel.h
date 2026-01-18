@@ -27,4 +27,7 @@ Column ExtractMinute(const Column& operand);
 Column StrLen(const Column& operand);
 Column DateTruncMinute(const Column& operand);
 
+// String operations
+Column StrRegexReplace(const Column& operand, const std::string& pattern, const std::string& replacement);
+
 }  // namespace ngn

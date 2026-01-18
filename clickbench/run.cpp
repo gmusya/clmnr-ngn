@@ -569,7 +569,7 @@ class QueryMaker {
                                    MakeBinary(BinaryFunction::kNotEqual, MakeVariable("Referer", Type::kString),
                                               MakeConst(Value(std::string(""))))),
                         {ProjectionUnit{MakeRegexReplace(MakeVariable("Referer", Type::kString),
-                                                         R"(^https?://(?:www\.)?([^/]+)/.*$)", R"(\1)"),
+                                                         R"(^https?://(?:www\.)?([^/]+)/.*$)", "$1"),
                                         "k"},
                          ProjectionUnit{MakeUnary(UnaryFunction::kStrLen, MakeVariable("Referer", Type::kString)),
                                         "ref_len"},
