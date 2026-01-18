@@ -92,4 +92,48 @@ TEST(Kernel, StrLen) {
   EXPECT_EQ(result, expected);
 }
 
+TEST(Kernel, DateTruncMinute) {
+  static constexpr int64_t kUsPerMin = 60000000LL;
+  static constexpr int64_t kUsPerSec = 1000000LL;
+
+  Column col(ArrayType<Type::kTimestamp>{
+      Timestamp{0},                           // 00:00:00.000000 -> 00:00:00
+      Timestamp{30 * kUsPerSec},              // 00:00:30.000000 -> 00:00:00
+      Timestamp{kUsPerMin + 45 * kUsPerSec},  // 00:01:45.000000 -> 00:01:00
+      Timestamp{2 * kUsPerMin - 1},           // 00:01:59.999999 -> 00:01:00
+  });
+
+  Column result = DateTruncMinute(col);
+
+  Column expected(ArrayType<Type::kTimestamp>{
+      Timestamp{0},
+      Timestamp{0},
+      Timestamp{kUsPerMin},
+      Timestamp{kUsPerMin},
+  });
+  EXPECT_EQ(result, expected);
+}
+
+TEST(Kernel, DateTruncMinuteBeforeEpoch) {
+  static constexpr int64_t kUsPerMin = 60000000LL;
+  static constexpr int64_t kUsPerSec = 1000000LL;
+
+  Column col(ArrayType<Type::kTimestamp>{
+      Timestamp{-1},               // 23:59:59.999999 on 1969-12-31 -> 23:59:00
+      Timestamp{-30 * kUsPerSec},  // 23:59:30 on 1969-12-31 -> 23:59:00
+      Timestamp{-kUsPerMin},       // 23:59:00 on 1969-12-31 -> 23:59:00
+      Timestamp{-kUsPerMin - 1},   // 23:58:59.999999 -> 23:58:00
+  });
+
+  Column result = DateTruncMinute(col);
+
+  Column expected(ArrayType<Type::kTimestamp>{
+      Timestamp{-kUsPerMin},
+      Timestamp{-kUsPerMin},
+      Timestamp{-kUsPerMin},
+      Timestamp{-2 * kUsPerMin},
+  });
+  EXPECT_EQ(result, expected);
+}
+
 }  // namespace ngn
