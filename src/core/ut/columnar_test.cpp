@@ -170,7 +170,8 @@ TEST(ColumnarFile, DateTimestampMixed) {
 
   Column col_id(ArrayType<Type::kInt64>{1, 2, 3});
   Column col_date(ArrayType<Type::kDate>{ParseDate("2013-07-15"), ParseDate("2013-07-16"), ParseDate("1970-01-01")});
-  Column col_ts(ArrayType<Type::kTimestamp>{ParseTimestamp("2013-07-15 10:30:45"), ParseTimestamp("2013-07-16 12:00:00"),
+  Column col_ts(ArrayType<Type::kTimestamp>{ParseTimestamp("2013-07-15 10:30:45"),
+                                            ParseTimestamp("2013-07-16 12:00:00"),
                                             ParseTimestamp("1970-01-01 00:00:00")});
 
   writer.AppendRowGroup({col_id, col_date, col_ts});
