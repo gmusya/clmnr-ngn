@@ -2,6 +2,7 @@
 
 #include <variant>
 
+#include "src/core/datetime.h"
 #include "src/core/type.h"
 
 namespace ngn {
@@ -44,9 +45,9 @@ class Value {
           } else if constexpr (std::is_same_v<T, PhysicalType<Type::kString>>) {
             return value;
           } else if constexpr (std::is_same_v<T, PhysicalType<Type::kDate>>) {
-            return std::to_string(value.value);
+            return FormatDate(value);
           } else if constexpr (std::is_same_v<T, PhysicalType<Type::kTimestamp>>) {
-            return std::to_string(value.value);
+            return FormatTimestamp(value);
           } else if constexpr (std::is_same_v<T, PhysicalType<Type::kChar>>) {
             return std::string(1, value);
           } else {

@@ -7,6 +7,7 @@ target_include_directories(ngn-csv INTERFACE ${CMAKE_SOURCE_DIR})
 add_executable(ngn-csv-test
   ut/columnar_test.cpp
   ut/csv_test.cpp
+  ut/datetime_test.cpp
   ut/schema_test.cpp
 )
 
