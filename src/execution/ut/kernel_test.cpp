@@ -83,4 +83,13 @@ TEST(Kernel, StrContainsNegated) {
   EXPECT_EQ(result, expected);
 }
 
+TEST(Kernel, StrLen) {
+  Column col(ArrayType<Type::kString>{"hello", "", "test string", "x"});
+
+  Column result = StrLen(col);
+
+  Column expected(ArrayType<Type::kInt64>{5, 0, 11, 1});
+  EXPECT_EQ(result, expected);
+}
+
 }  // namespace ngn
