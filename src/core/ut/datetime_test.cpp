@@ -214,4 +214,51 @@ TEST(DateTime, ParseTimestampBeforeEpoch) {
   EXPECT_EQ(ts.value, -86400000000LL);
 }
 
+TEST(DateTime, FormatDateBasic) {
+  EXPECT_EQ(FormatDate(Date{0}), "1970-01-01");
+  EXPECT_EQ(FormatDate(Date{1}), "1970-01-02");
+  EXPECT_EQ(FormatDate(Date{31}), "1970-02-01");
+  EXPECT_EQ(FormatDate(Date{-1}), "1969-12-31");
+  EXPECT_EQ(FormatDate(Date{10957}), "2000-01-01");
+  EXPECT_EQ(FormatDate(Date{15887}), "2013-07-01");
+  EXPECT_EQ(FormatDate(Date{15901}), "2013-07-15");
+}
+
+TEST(DateTime, FormatDateRoundtrip) {
+  auto roundtrip = [](const std::string& s) { return FormatDate(ParseDate(s)); };
+
+  EXPECT_EQ(roundtrip("1970-01-01"), "1970-01-01");
+  EXPECT_EQ(roundtrip("2000-02-29"), "2000-02-29");
+  EXPECT_EQ(roundtrip("2023-12-31"), "2023-12-31");
+  EXPECT_EQ(roundtrip("1969-01-01"), "1969-01-01");
+}
+
+TEST(DateTime, FormatTimestampBasic) {
+  EXPECT_EQ(FormatTimestamp(Timestamp{0}), "1970-01-01 00:00:00");
+  EXPECT_EQ(FormatTimestamp(Timestamp{1000000}), "1970-01-01 00:00:01");
+  EXPECT_EQ(FormatTimestamp(Timestamp{3600000000LL}), "1970-01-01 01:00:00");
+  EXPECT_EQ(FormatTimestamp(Timestamp{86400000000LL}), "1970-01-02 00:00:00");
+}
+
+TEST(DateTime, FormatTimestampWithMicroseconds) {
+  EXPECT_EQ(FormatTimestamp(Timestamp{1}), "1970-01-01 00:00:00.000001");
+  EXPECT_EQ(FormatTimestamp(Timestamp{123456}), "1970-01-01 00:00:00.123456");
+  EXPECT_EQ(FormatTimestamp(Timestamp{1500000}), "1970-01-01 00:00:01.500000");
+}
+
+TEST(DateTime, FormatTimestampBeforeEpoch) {
+  EXPECT_EQ(FormatTimestamp(Timestamp{-1000000}), "1969-12-31 23:59:59");
+  EXPECT_EQ(FormatTimestamp(Timestamp{-86400000000LL}), "1969-12-31 00:00:00");
+}
+
+TEST(DateTime, FormatTimestampRoundtrip) {
+  auto roundtrip = [](const std::string& s) { return FormatTimestamp(ParseTimestamp(s)); };
+
+  EXPECT_EQ(roundtrip("1970-01-01 00:00:00"), "1970-01-01 00:00:00");
+  EXPECT_EQ(roundtrip("2023-07-15 12:30:45"), "2023-07-15 12:30:45");
+  EXPECT_EQ(roundtrip("2000-02-29 23:59:59"), "2000-02-29 23:59:59");
+  EXPECT_EQ(roundtrip("1969-12-31 23:59:59"), "1969-12-31 23:59:59");
+  EXPECT_EQ(roundtrip("2023-07-15 10:30:45.123456"), "2023-07-15 10:30:45.123456");
+}
+
 }  // namespace ngn

@@ -40,6 +40,33 @@ inline int64_t DateToDays(int year, int month, int day) {
   return days - kEpochDays;
 }
 
+// Convert days since 1970-01-01 to year, month, day
+inline void DaysToDate(int64_t days, int& year, int& month, int& day) {
+  static constexpr int64_t kEpochDays = 719162;
+  int64_t total_days = days + kEpochDays;
+
+  // Estimate year (approximate)
+  year = static_cast<int>(total_days / 365);
+  while (DaysFromYear1(year + 1) <= total_days) {
+    ++year;
+  }
+  while (DaysFromYear1(year) > total_days) {
+    --year;
+  }
+
+  // Days remaining in the year
+  int64_t day_of_year = total_days - DaysFromYear1(year);
+
+  // Find month
+  month = 1;
+  while (month <= 12 && day_of_year >= DaysInMonth(year, month)) {
+    day_of_year -= DaysInMonth(year, month);
+    ++month;
+  }
+
+  day = static_cast<int>(day_of_year) + 1;  // 1-indexed
+}
+
 namespace internal {
 
 inline int ParseInt(std::string_view s, size_t& pos, size_t len) {
@@ -157,6 +184,53 @@ inline Timestamp ParseTimestamp(std::string_view s) {
                     static_cast<int64_t>(second) * 1000000LL + microseconds;
 
   return Timestamp{days * 86400000000LL + time_us};
+}
+
+// Format Date as "YYYY-MM-DD"
+inline std::string FormatDate(Date date) {
+  int year, month, day;
+  datetime::DaysToDate(date.value, year, month, day);
+
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%04d-%02d-%02d", year, month, day);
+  return buf;
+}
+
+// Format Timestamp as "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD HH:MM:SS.ffffff" if microseconds != 0
+inline std::string FormatTimestamp(Timestamp ts) {
+  static constexpr int64_t kMicrosecondsPerDay = 86400000000LL;
+  static constexpr int64_t kMicrosecondsPerHour = 3600000000LL;
+  static constexpr int64_t kMicrosecondsPerMinute = 60000000LL;
+  static constexpr int64_t kMicrosecondsPerSecond = 1000000LL;
+
+  int64_t total_us = ts.value;
+  int64_t days = total_us / kMicrosecondsPerDay;
+  int64_t time_us = total_us % kMicrosecondsPerDay;
+
+  // Handle negative timestamps
+  if (time_us < 0) {
+    days -= 1;
+    time_us += kMicrosecondsPerDay;
+  }
+
+  int year, month, day;
+  datetime::DaysToDate(days, year, month, day);
+
+  int hour = static_cast<int>(time_us / kMicrosecondsPerHour);
+  time_us %= kMicrosecondsPerHour;
+  int minute = static_cast<int>(time_us / kMicrosecondsPerMinute);
+  time_us %= kMicrosecondsPerMinute;
+  int second = static_cast<int>(time_us / kMicrosecondsPerSecond);
+  int microseconds = static_cast<int>(time_us % kMicrosecondsPerSecond);
+
+  char buf[32];
+  if (microseconds != 0) {
+    snprintf(buf, sizeof(buf), "%04d-%02d-%02d %02d:%02d:%02d.%06d", year, month, day, hour, minute, second,
+             microseconds);
+  } else {
+    snprintf(buf, sizeof(buf), "%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second);
+  }
+  return buf;
 }
 
 }  // namespace ngn
