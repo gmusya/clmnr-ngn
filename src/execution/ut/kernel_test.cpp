@@ -133,6 +133,31 @@ TEST(Kernel, DateTruncMinuteBeforeEpoch) {
       Timestamp{-kUsPerMin},
       Timestamp{-2 * kUsPerMin},
   });
+
+  EXPECT_EQ(result, expected);
+}
+
+TEST(Kernel, StrRegexReplace) {
+  Column col(ArrayType<Type::kString>{
+      "https://www.google.com/search?q=test",
+      "http://example.org/page",
+      "https://test.example.com/path/to/resource",
+  });
+
+  // Extract domain: ^https?://(?:www\.)?([^/]+)/.*$ -> $1
+  Column result = StrRegexReplace(col, R"(^https?://(?:www\.)?([^/]+)/.*$)", "$1");
+
+  Column expected(ArrayType<Type::kString>{"google.com", "example.org", "test.example.com"});
+  EXPECT_EQ(result, expected);
+}
+
+TEST(Kernel, StrRegexReplaceSimple) {
+  Column col(ArrayType<Type::kString>{"hello world", "foo bar baz"});
+
+  // Replace spaces with underscores
+  Column result = StrRegexReplace(col, " ", "_");
+
+  Column expected(ArrayType<Type::kString>{"hello_world", "foo_bar_baz"});
   EXPECT_EQ(result, expected);
 }
 

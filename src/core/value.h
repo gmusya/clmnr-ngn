@@ -29,6 +29,34 @@ class Value {
   GenericValue& GetValue() { return value_; }
   const GenericValue& GetValue() const { return value_; }
 
+  Type GetType() const {
+    return std::visit(
+        []<typename T>(const T&) -> Type {
+          if constexpr (std::is_same_v<T, PhysicalType<Type::kBool>>) {
+            return Type::kBool;
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt16>>) {
+            return Type::kInt16;
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt32>>) {
+            return Type::kInt32;
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt64>>) {
+            return Type::kInt64;
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kInt128>>) {
+            return Type::kInt128;
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kString>>) {
+            return Type::kString;
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kDate>>) {
+            return Type::kDate;
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kTimestamp>>) {
+            return Type::kTimestamp;
+          } else if constexpr (std::is_same_v<T, PhysicalType<Type::kChar>>) {
+            return Type::kChar;
+          } else {
+            static_assert(false);
+          }
+        },
+        value_);
+  }
+
   std::string ToString() const {
     return std::visit(
         []<typename T>(const T& value) -> std::string {

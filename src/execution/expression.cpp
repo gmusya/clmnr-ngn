@@ -128,7 +128,10 @@ Column EvaluateCase(std::shared_ptr<Batch> batch, std::shared_ptr<Case> expressi
       then_col.GetType());
 }
 
-Column EvaluateRegexReplace(std::shared_ptr<Batch>, std::shared_ptr<RegexReplace>) { THROW_NOT_IMPLEMENTED; }
+Column EvaluateRegexReplace(std::shared_ptr<Batch> batch, std::shared_ptr<RegexReplace> expression) {
+  Column operand = Evaluate(batch, expression->operand);
+  return StrRegexReplace(operand, expression->pattern, expression->replacement);
+}
 
 }  // namespace
 
