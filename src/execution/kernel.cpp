@@ -304,7 +304,17 @@ Column ExtractMinute(const Column& operand) {
   return Column(std::move(result));
 }
 
-Column StrLen(const Column&) { THROW_NOT_IMPLEMENTED; }
+Column StrLen(const Column& operand) {
+  ASSERT(operand.GetType() == Type::kString);
+  const auto& values = std::get<ArrayType<Type::kString>>(operand.Values());
+
+  ArrayType<Type::kInt64> result(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    result[i] = static_cast<int64_t>(values[i].size());
+  }
+  return Column(std::move(result));
+}
+
 Column DateTruncMinute(const Column&) { THROW_NOT_IMPLEMENTED; }
 
 }  // namespace ngn
