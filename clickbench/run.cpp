@@ -395,7 +395,7 @@ class QueryMaker {
                  ProjectionUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}}),
             MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
                             {GroupByUnit{MakeVariable("UserID", Type::kInt64), "UserID"},
-                             GroupByUnit{MakeVariable("m", Type::kInt64), "m"},
+                             GroupByUnit{MakeVariable("m", Type::kInt16), "m"},
                              GroupByUnit{MakeVariable("SearchPhrase", Type::kString), "SearchPhrase"}})),
         {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
 

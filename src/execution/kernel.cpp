@@ -263,8 +263,37 @@ Column GreaterOrEqual(const Column& lhs, const Column& rhs) {
 
 Column LikeMatch(const Column&, const std::string&, bool) { THROW_NOT_IMPLEMENTED; }
 
-Column Not(const Column&) { THROW_NOT_IMPLEMENTED; }
-Column ExtractMinute(const Column&) { THROW_NOT_IMPLEMENTED; }
+Column Not(const Column& operand) {
+  ASSERT(operand.GetType() == Type::kBool);
+  const auto& values = std::get<ArrayType<Type::kBool>>(operand.Values());
+  ArrayType<Type::kBool> result(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    result[i] = Boolean{!values[i].value};
+  }
+  return Column(std::move(result));
+}
+
+Column ExtractMinute(const Column& operand) {
+  ASSERT(operand.GetType() == Type::kTimestamp);
+  const auto& values = std::get<ArrayType<Type::kTimestamp>>(operand.Values());
+
+  static constexpr int64_t kMicrosecondsPerMinute = 60000000LL;
+  static constexpr int64_t kMinutesPerHour = 60;
+
+  ArrayType<Type::kInt16> result(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    int64_t total_us = values[i].value;
+    // Handle negative timestamps (before epoch)
+    int64_t total_minutes = total_us / kMicrosecondsPerMinute;
+    int64_t minute = total_minutes % kMinutesPerHour;
+    if (minute < 0) {
+      minute += kMinutesPerHour;
+    }
+    result[i] = static_cast<int16_t>(minute);
+  }
+  return Column(std::move(result));
+}
+
 Column StrLen(const Column&) { THROW_NOT_IMPLEMENTED; }
 Column DateTruncMinute(const Column&) { THROW_NOT_IMPLEMENTED; }
 
