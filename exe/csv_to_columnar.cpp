@@ -3,6 +3,7 @@
 #include "absl/log/log.h"
 #include "src/core/columnar.h"
 #include "src/core/csv.h"
+#include "src/core/datetime.h"
 #include "src/core/schema.h"
 #include "src/core/type.h"
 #include "src/util/macro.h"
@@ -132,12 +133,11 @@ int main(int argc, char** argv) {
           std::get<ngn::ArrayType<ngn::Type::kString>>(columns[i].Values()).emplace_back(row.value()[i]);
           break;
         case ngn::Type::kDate:
-          // TODO(gmusya): parse date
-          std::get<ngn::ArrayType<ngn::Type::kDate>>(columns[i].Values()).emplace_back(ngn::Date{0});
+          std::get<ngn::ArrayType<ngn::Type::kDate>>(columns[i].Values()).emplace_back(ngn::ParseDate(row.value()[i]));
           break;
         case ngn::Type::kTimestamp:
-          // TODO(gmusya): parse timestamp
-          std::get<ngn::ArrayType<ngn::Type::kTimestamp>>(columns[i].Values()).emplace_back(ngn::Timestamp{0});
+          std::get<ngn::ArrayType<ngn::Type::kTimestamp>>(columns[i].Values())
+              .emplace_back(ngn::ParseTimestamp(row.value()[i]));
           break;
         case ngn::Type::kChar:
           std::get<ngn::ArrayType<ngn::Type::kChar>>(columns[i].Values()).emplace_back(row.value()[i][0]);

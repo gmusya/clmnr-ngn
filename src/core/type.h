@@ -24,13 +24,13 @@ enum class Type {
 ////////////////////////////////////////////////////////////////////////////////
 
 struct Date {
-  int64_t value;
+  int64_t value;  // Days since 1970-01-01
 
   auto operator<=>(const Date& other) const = default;
 };
 
 struct Timestamp {
-  int64_t value;
+  int64_t value;  // Microseconds since 1970-01-01 00:00:00 UTC
 
   auto operator<=>(const Timestamp& other) const = default;
 };
