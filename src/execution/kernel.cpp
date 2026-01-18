@@ -263,8 +263,37 @@ Column GreaterOrEqual(const Column& lhs, const Column& rhs) {
 
 Column LikeMatch(const Column&, const std::string&, bool) { THROW_NOT_IMPLEMENTED; }
 
-Column Not(const Column&) { THROW_NOT_IMPLEMENTED; }
-Column ExtractMinute(const Column&) { THROW_NOT_IMPLEMENTED; }
+Column Not(const Column& operand) {
+  ASSERT(operand.GetType() == Type::kBool);
+  const auto& values = std::get<ArrayType<Type::kBool>>(operand.Values());
+  ArrayType<Type::kBool> result(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    result[i] = Boolean{!values[i].value};
+  }
+  return Column(std::move(result));
+}
+
+Column ExtractMinute(const Column& operand) {
+  ASSERT(operand.GetType() == Type::kTimestamp);
+  const auto& values = std::get<ArrayType<Type::kTimestamp>>(operand.Values());
+
+  static constexpr int64_t kMicrosecondsPerMinute = 60000000LL;
+  static constexpr int64_t kMicrosecondsPerHour = 3600000000LL;
+
+  ArrayType<Type::kInt16> result(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    int64_t total_us = values[i].value;
+    // Get microseconds within the current hour (always positive)
+    int64_t us_within_hour = total_us % kMicrosecondsPerHour;
+    if (us_within_hour < 0) {
+      us_within_hour += kMicrosecondsPerHour;
+    }
+    int64_t minute = us_within_hour / kMicrosecondsPerMinute;
+    result[i] = static_cast<int16_t>(minute);
+  }
+  return Column(std::move(result));
+}
+
 Column StrLen(const Column&) { THROW_NOT_IMPLEMENTED; }
 Column DateTruncMinute(const Column&) { THROW_NOT_IMPLEMENTED; }
 
