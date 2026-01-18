@@ -946,8 +946,11 @@ class QueryMaker {
                                              MakeConst(Value(Date{15917})))),
                        MakeBinary(BinaryFunction::kEqual, MakeVariable("IsRefresh", Type::kInt16),
                                   MakeConst(Value(static_cast<int16_t>(0))))),
-            MakeIn(MakeVariable("TraficSourceID", Type::kInt16),
-                   {Value(static_cast<int16_t>(-1)), Value(static_cast<int16_t>(6))})),
+            MakeBinary(BinaryFunction::kOr,
+                       MakeBinary(BinaryFunction::kEqual, MakeVariable("TraficSourceID", Type::kInt16),
+                                  MakeConst(Value(static_cast<int16_t>(-1)))),
+                       MakeBinary(BinaryFunction::kEqual, MakeVariable("TraficSourceID", Type::kInt16),
+                                  MakeConst(Value(static_cast<int16_t>(6)))))),
         MakeBinary(BinaryFunction::kEqual, MakeVariable("RefererHash", Type::kInt64),
                    MakeConst(Value(static_cast<int64_t>(3594120000172545465LL)))));
 
