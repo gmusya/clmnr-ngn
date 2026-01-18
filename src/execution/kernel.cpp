@@ -278,17 +278,17 @@ Column ExtractMinute(const Column& operand) {
   const auto& values = std::get<ArrayType<Type::kTimestamp>>(operand.Values());
 
   static constexpr int64_t kMicrosecondsPerMinute = 60000000LL;
-  static constexpr int64_t kMinutesPerHour = 60;
+  static constexpr int64_t kMicrosecondsPerHour = 3600000000LL;
 
   ArrayType<Type::kInt16> result(values.size());
   for (size_t i = 0; i < values.size(); ++i) {
     int64_t total_us = values[i].value;
-    // Handle negative timestamps (before epoch)
-    int64_t total_minutes = total_us / kMicrosecondsPerMinute;
-    int64_t minute = total_minutes % kMinutesPerHour;
-    if (minute < 0) {
-      minute += kMinutesPerHour;
+    // Get microseconds within the current hour (always positive)
+    int64_t us_within_hour = total_us % kMicrosecondsPerHour;
+    if (us_within_hour < 0) {
+      us_within_hour += kMicrosecondsPerHour;
     }
+    int64_t minute = us_within_hour / kMicrosecondsPerMinute;
     result[i] = static_cast<int16_t>(minute);
   }
   return Column(std::move(result));
