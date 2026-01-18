@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -19,6 +21,67 @@
 ABSL_FLAG(std::string, input, "", "Input columnar file (.clmnr)");
 ABSL_FLAG(std::string, schema, "", "Schema file (.schema)");
 ABSL_FLAG(std::string, output_dir, "", "Output directory for CSV results. Files will be named q{i}.csv");
+ABSL_FLAG(std::string, queries, "", "Comma-separated list of queries to run (e.g., '0,5,10' or 'Q0,Q5,Q10')");
+ABSL_FLAG(std::string, skip, "", "Comma-separated list of queries to skip (e.g., '0,5,10' or 'Q0,Q5,Q10')");
+ABSL_FLAG(int32_t, from, -1, "First query index to run (inclusive)");
+ABSL_FLAG(int32_t, to, -1, "Last query index to run (inclusive)");
+
+namespace {
+
+std::set<int> ParseQueryList(const std::string& str) {
+  std::set<int> result;
+  if (str.empty()) {
+    return result;
+  }
+  std::stringstream ss(str);
+  std::string token;
+  while (std::getline(ss, token, ',')) {
+    // Remove leading/trailing whitespace
+    size_t start = token.find_first_not_of(" \t");
+    size_t end = token.find_last_not_of(" \t");
+    if (start == std::string::npos) {
+      continue;
+    }
+    token = token.substr(start, end - start + 1);
+    // Remove 'Q' or 'q' prefix if present
+    if (!token.empty() && (token[0] == 'Q' || token[0] == 'q')) {
+      token = token.substr(1);
+    }
+    try {
+      result.insert(std::stoi(token));
+    } catch (...) {
+      std::cerr << "Warning: ignoring invalid query number: " << token << "\n";
+    }
+  }
+  return result;
+}
+
+bool ShouldRunQuery(size_t index, const std::set<int>& only_queries, const std::set<int>& skip_queries, int32_t from,
+                    int32_t to) {
+  int idx = static_cast<int>(index);
+
+  // Check --skip first
+  if (skip_queries.count(idx)) {
+    return false;
+  }
+
+  // If --queries is specified, only run those
+  if (!only_queries.empty()) {
+    return only_queries.count(idx) > 0;
+  }
+
+  // Check --from/--to range
+  if (from >= 0 && idx < from) {
+    return false;
+  }
+  if (to >= 0 && idx > to) {
+    return false;
+  }
+
+  return true;
+}
+
+}  // namespace
 
 namespace ngn {
 
@@ -1021,7 +1084,16 @@ int main(int argc, char** argv) {
       query_maker.MakeQ35(), query_maker.MakeQ36(), query_maker.MakeQ37(), query_maker.MakeQ38(), query_maker.MakeQ39(),
       query_maker.MakeQ40(), query_maker.MakeQ41(), query_maker.MakeQ42()};
 
+  const auto only_queries = ParseQueryList(absl::GetFlag(FLAGS_queries));
+  const auto skip_queries = ParseQueryList(absl::GetFlag(FLAGS_skip));
+  const int32_t from = absl::GetFlag(FLAGS_from);
+  const int32_t to = absl::GetFlag(FLAGS_to);
+
   for (size_t i = 0; i < queries.size(); ++i) {
+    if (!ShouldRunQuery(i, only_queries, skip_queries, from, to)) {
+      continue;
+    }
+
     auto& q = queries[i];
     LOG(INFO) << "Running " << q.name;
     try {
