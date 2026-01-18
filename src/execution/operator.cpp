@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <numeric>
 #include <queue>
+#include <unordered_map>
 
 #include "src/core/columnar.h"
 #include "src/execution/aggregation_executor.h"
@@ -36,19 +37,38 @@ class AggregationStream : public IStream<std::shared_ptr<Batch>> {
 
 class ScanStream : public IStream<std::shared_ptr<Batch>> {
  public:
-  ScanStream(std::shared_ptr<ScanOperator> scan) : reader_(scan->input_path), op_(std::move(scan)) {}
+  ScanStream(std::shared_ptr<ScanOperator> scan) : reader_(scan->input_path), op_(std::move(scan)) {
+    // Build mapping from column name to index in file schema
+    const auto& file_fields = reader_.GetSchema().Fields();
+    for (size_t i = 0; i < file_fields.size(); ++i) {
+      column_name_to_index_[file_fields[i].name] = i;
+    }
+
+    // Precompute indices of columns to read
+    for (const auto& field : op_->schema.Fields()) {
+      auto it = column_name_to_index_.find(field.name);
+      ASSERT_WITH_MESSAGE(it != column_name_to_index_.end(), "Column not found in file: " + field.name);
+      columns_to_read_.push_back(it->second);
+    }
+  }
 
   std::optional<std::shared_ptr<Batch>> Next() override {
     if (row_group_index_ >= reader_.RowGroupCount()) {
       return std::nullopt;
     }
 
-    auto columns = reader_.ReadRowGroup(row_group_index_);
-    ++row_group_index_;
-
-    if (op_->schema != reader_.GetSchema()) {
-      THROW_NOT_IMPLEMENTED;
+    if (columns_to_read_.empty()) {
+      int64_t row_count = reader_.RowGroupRowCount(row_group_index_);
+      ++row_group_index_;
+      return std::make_shared<Batch>(row_count, op_->schema);
     }
+
+    std::vector<Column> columns;
+    columns.reserve(columns_to_read_.size());
+    for (size_t col_idx : columns_to_read_) {
+      columns.push_back(reader_.ReadRowGroupColumn(row_group_index_, col_idx));
+    }
+    ++row_group_index_;
 
     return std::make_shared<Batch>(std::move(columns), op_->schema);
   }
@@ -57,6 +77,9 @@ class ScanStream : public IStream<std::shared_ptr<Batch>> {
   FileReader reader_;
 
   std::shared_ptr<ScanOperator> op_;
+
+  std::unordered_map<std::string, size_t> column_name_to_index_;
+  std::vector<size_t> columns_to_read_;
 
   size_t row_group_index_ = 0;
 };

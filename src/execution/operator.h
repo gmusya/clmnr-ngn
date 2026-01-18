@@ -29,7 +29,6 @@ struct ScanOperator : public Operator {
   ScanOperator(std::string i, Schema s)
       : Operator(OperatorType::kScan), input_path(std::move(i)), schema(std::move(s)) {
     ASSERT(!input_path.empty());
-    ASSERT(!schema.Fields().empty());
   }
 
   std::string input_path;
