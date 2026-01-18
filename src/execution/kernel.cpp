@@ -261,7 +261,17 @@ Column GreaterOrEqual(const Column& lhs, const Column& rhs) {
       lhs.GetType()));
 }
 
-Column LikeMatch(const Column&, const std::string&, bool) { THROW_NOT_IMPLEMENTED; }
+Column StrContains(const Column& operand, const std::string& substring, bool negated) {
+  ASSERT(operand.GetType() == Type::kString);
+  const auto& values = std::get<ArrayType<Type::kString>>(operand.Values());
+
+  ArrayType<Type::kBool> result(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    bool found = values[i].find(substring) != std::string::npos;
+    result[i] = Boolean{negated ? !found : found};
+  }
+  return Column(std::move(result));
+}
 
 Column Not(const Column& operand) {
   ASSERT(operand.GetType() == Type::kBool);

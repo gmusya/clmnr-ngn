@@ -97,9 +97,9 @@ Column EvaluateUnary(std::shared_ptr<Batch> batch, std::shared_ptr<Unary> expres
   }
 }
 
-Column EvaluateLike(std::shared_ptr<Batch> batch, std::shared_ptr<Like> expression) {
+Column EvaluateContains(std::shared_ptr<Batch> batch, std::shared_ptr<Contains> expression) {
   Column operand = Evaluate(batch, expression->operand);
-  return LikeMatch(operand, expression->pattern, expression->negated);
+  return StrContains(operand, expression->substring, expression->negated);
 }
 
 Column EvaluateIn(std::shared_ptr<Batch>, std::shared_ptr<In>) { THROW_NOT_IMPLEMENTED; }
@@ -120,8 +120,8 @@ Column Evaluate(std::shared_ptr<Batch> batch, std::shared_ptr<Expression> expres
       return EvaluateUnary(batch, std::static_pointer_cast<Unary>(expression));
     case ExpressionType::kBinary:
       return EvaluateBinary(batch, std::static_pointer_cast<Binary>(expression));
-    case ExpressionType::kLike:
-      return EvaluateLike(batch, std::static_pointer_cast<Like>(expression));
+    case ExpressionType::kContains:
+      return EvaluateContains(batch, std::static_pointer_cast<Contains>(expression));
     case ExpressionType::kIn:
       return EvaluateIn(batch, std::static_pointer_cast<In>(expression));
     case ExpressionType::kCase:

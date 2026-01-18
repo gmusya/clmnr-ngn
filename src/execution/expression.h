@@ -14,7 +14,7 @@ enum class ExpressionType {
   kVariable,
   kUnary,
   kBinary,
-  kLike,
+  kContains,
   kIn,
   kCase,
   kRegexReplace,
@@ -81,12 +81,12 @@ struct Binary : public Expression {
   std::shared_ptr<Expression> rhs;
 };
 
-struct Like : public Expression {
-  explicit Like(std::shared_ptr<Expression> op, std::string pat, bool neg)
-      : Expression(ExpressionType::kLike), operand(std::move(op)), pattern(std::move(pat)), negated(neg) {}
+struct Contains : public Expression {
+  explicit Contains(std::shared_ptr<Expression> op, std::string substr, bool neg)
+      : Expression(ExpressionType::kContains), operand(std::move(op)), substring(std::move(substr)), negated(neg) {}
 
   std::shared_ptr<Expression> operand;
-  std::string pattern;
+  std::string substring;
   bool negated;
 };
 
@@ -138,8 +138,9 @@ inline std::shared_ptr<Binary> MakeBinary(BinaryFunction function, std::shared_p
   return std::make_shared<Binary>(std::move(function), std::move(lhs), std::move(rhs));
 }
 
-inline std::shared_ptr<Like> MakeLike(std::shared_ptr<Expression> operand, std::string pattern, bool negated = false) {
-  return std::make_shared<Like>(std::move(operand), std::move(pattern), negated);
+inline std::shared_ptr<Contains> MakeContains(std::shared_ptr<Expression> operand, std::string substring,
+                                              bool negated = false) {
+  return std::make_shared<Contains>(std::move(operand), std::move(substring), negated);
 }
 
 inline std::shared_ptr<In> MakeIn(std::shared_ptr<Expression> operand, std::vector<Value> values) {

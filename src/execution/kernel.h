@@ -19,7 +19,7 @@ Column Equal(const Column& lhs, const Column& rhs);
 Column NotEqual(const Column& lhs, const Column& rhs);
 Column LessOrEqual(const Column& lhs, const Column& rhs);
 Column GreaterOrEqual(const Column& lhs, const Column& rhs);
-Column LikeMatch(const Column& operand, const std::string& pattern, bool negated);
+Column StrContains(const Column& operand, const std::string& substring, bool negated);
 
 // Unary operations
 Column Not(const Column& operand);
