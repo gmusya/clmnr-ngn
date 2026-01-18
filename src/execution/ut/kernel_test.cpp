@@ -65,4 +65,22 @@ TEST(Kernel, ExtractMinuteBeforeEpoch) {
   EXPECT_EQ(result, expected);
 }
 
+TEST(Kernel, StrContains) {
+  Column col(ArrayType<Type::kString>{"hello world", "google.com", "example.org", ""});
+
+  Column result = StrContains(col, "google", false);
+
+  Column expected(ArrayType<Type::kBool>{Boolean{false}, Boolean{true}, Boolean{false}, Boolean{false}});
+  EXPECT_EQ(result, expected);
+}
+
+TEST(Kernel, StrContainsNegated) {
+  Column col(ArrayType<Type::kString>{"hello world", "google.com", "example.org", ""});
+
+  Column result = StrContains(col, "google", true);
+
+  Column expected(ArrayType<Type::kBool>{Boolean{true}, Boolean{false}, Boolean{true}, Boolean{true}});
+  EXPECT_EQ(result, expected);
+}
+
 }  // namespace ngn

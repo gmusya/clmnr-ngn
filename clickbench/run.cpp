@@ -418,7 +418,7 @@ class QueryMaker {
     // SELECT COUNT(*) FROM hits WHERE URL LIKE '%google%';
 
     std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeFilter(MakeScan(input_, S({"URL"})), MakeLike(MakeVariable("URL", Type::kString), "%google%")),
+        MakeFilter(MakeScan(input_, S({"URL"})), MakeContains(MakeVariable("URL", Type::kString), "google")),
         MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
                         {}));
 
@@ -432,7 +432,7 @@ class QueryMaker {
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
             MakeFilter(MakeScan(input_, S({"URL", "SearchPhrase"})),
-                       MakeBinary(BinaryFunction::kAnd, MakeLike(MakeVariable("URL", Type::kString), "%google%"),
+                       MakeBinary(BinaryFunction::kAnd, MakeContains(MakeVariable("URL", Type::kString), "google"),
                                   MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
                                              MakeConst(Value(std::string("")))))),
             MakeAggregation({AggregationUnit{AggregationType::kMin, MakeVariable("URL", Type::kString), "min_url"},
@@ -449,13 +449,13 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(
-                MakeScan(input_, S({"Title", "URL", "SearchPhrase", "UserID"})),
-                MakeBinary(BinaryFunction::kAnd,
-                           MakeBinary(BinaryFunction::kAnd, MakeLike(MakeVariable("Title", Type::kString), "%Google%"),
-                                      MakeLike(MakeVariable("URL", Type::kString), "%.google.%", true)),
-                           MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
-                                      MakeConst(Value(std::string("")))))),
+            MakeFilter(MakeScan(input_, S({"Title", "URL", "SearchPhrase", "UserID"})),
+                       MakeBinary(BinaryFunction::kAnd,
+                                  MakeBinary(BinaryFunction::kAnd,
+                                             MakeContains(MakeVariable("Title", Type::kString), "Google"),
+                                             MakeContains(MakeVariable("URL", Type::kString), ".google.", true)),
+                                  MakeBinary(BinaryFunction::kNotEqual, MakeVariable("SearchPhrase", Type::kString),
+                                             MakeConst(Value(std::string("")))))),
             MakeAggregation(
                 {AggregationUnit{AggregationType::kMin, MakeVariable("URL", Type::kString), "min_url"},
                  AggregationUnit{AggregationType::kMin, MakeVariable("Title", Type::kString), "min_title"},
@@ -473,7 +473,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan =
         MakeTopK(MakeProject(MakeFilter(MakeScan(input_, S({"WatchID", "EventTime", "URL", "Title"})),
-                                        MakeLike(MakeVariable("URL", Type::kString), "%google%")),
+                                        MakeContains(MakeVariable("URL", Type::kString), "google")),
                              {ProjectionUnit{MakeVariable("WatchID", Type::kInt64), "WatchID"},
                               ProjectionUnit{MakeVariable("EventTime", Type::kTimestamp), "EventTime"},
                               ProjectionUnit{MakeVariable("URL", Type::kString), "URL"},
