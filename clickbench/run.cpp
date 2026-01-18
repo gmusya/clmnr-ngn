@@ -547,11 +547,11 @@ class QueryMaker {
                 MakeBinary(BinaryFunction::kGreater, MakeVariable("c", Type::kInt64),
                            MakeConst(Value(static_cast<int64_t>(100000))))),
             {ProjectionUnit{MakeVariable("CounterID", Type::kInt32), "CounterID"},
-             ProjectionUnit{MakeBinary(BinaryFunction::kDiv, MakeVariable("sum_len", Type::kInt64),
+             ProjectionUnit{MakeBinary(BinaryFunction::kDiv, MakeVariable("sum_len", Type::kInt128),
                                        MakeVariable("c", Type::kInt64)),
                             "l"},
              ProjectionUnit{MakeVariable("c", Type::kInt64), "c"}}),
-        {SortUnit{MakeVariable("l", Type::kInt64), false}}, 25);
+        {SortUnit{MakeVariable("l", Type::kInt128), false}}, 25);
 
     return QueryInfo{.plan = plan, .name = "Q27"};
   }
@@ -582,12 +582,12 @@ class QueryMaker {
                 MakeBinary(BinaryFunction::kGreater, MakeVariable("c", Type::kInt64),
                            MakeConst(Value(static_cast<int64_t>(100000))))),
             {ProjectionUnit{MakeVariable("k", Type::kString), "k"},
-             ProjectionUnit{MakeBinary(BinaryFunction::kDiv, MakeVariable("sum_len", Type::kInt64),
+             ProjectionUnit{MakeBinary(BinaryFunction::kDiv, MakeVariable("sum_len", Type::kInt128),
                                        MakeVariable("c", Type::kInt64)),
                             "l"},
              ProjectionUnit{MakeVariable("c", Type::kInt64), "c"},
              ProjectionUnit{MakeVariable("min_ref", Type::kString), "min_ref"}}),
-        {SortUnit{MakeVariable("l", Type::kInt64), false}}, 25);
+        {SortUnit{MakeVariable("l", Type::kInt128), false}}, 25);
 
     return QueryInfo{.plan = plan, .name = "Q28"};
   }
