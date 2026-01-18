@@ -319,6 +319,23 @@ Column StrLen(const Column& operand) {
   return Column(std::move(result));
 }
 
-Column DateTruncMinute(const Column&) { THROW_NOT_IMPLEMENTED; }
+Column DateTruncMinute(const Column& operand) {
+  ASSERT(operand.GetType() == Type::kTimestamp);
+  const auto& values = std::get<ArrayType<Type::kTimestamp>>(operand.Values());
+
+  static constexpr int64_t kMicrosecondsPerMinute = 60000000LL;
+
+  ArrayType<Type::kTimestamp> result(values.size());
+  for (size_t i = 0; i < values.size(); ++i) {
+    int64_t total_us = values[i].value;
+    // Floor division to truncate to minute boundary
+    int64_t minutes = total_us / kMicrosecondsPerMinute;
+    if (total_us < 0 && total_us % kMicrosecondsPerMinute != 0) {
+      --minutes;  // Adjust for negative timestamps to get floor behavior
+    }
+    result[i] = Timestamp{minutes * kMicrosecondsPerMinute};
+  }
+  return Column(std::move(result));
+}
 
 }  // namespace ngn
