@@ -28,10 +28,10 @@ TEST(Kernel, Not) {
 
 TEST(Kernel, ExtractMinute) {
   Column col(ArrayType<Type::kTimestamp>{
-      Timestamp{0},                       // 00:00:00
-      Timestamp{30 * 60 * 1000000LL},     // 00:30:00
-      Timestamp{105 * 60 * 1000000LL},    // 01:45:00
-      Timestamp{3599 * 1000000LL},        // 00:59:59
+      Timestamp{0},                     // 00:00:00
+      Timestamp{30 * 60 * 1000000LL},   // 00:30:00
+      Timestamp{105 * 60 * 1000000LL},  // 01:45:00
+      Timestamp{3599 * 1000000LL},      // 00:59:59
   });
 
   Column result = ExtractMinute(col);
@@ -55,7 +55,7 @@ TEST(Kernel, ExtractMinuteFromParsedTimestamps) {
 
 TEST(Kernel, ExtractMinuteBeforeEpoch) {
   Column col(ArrayType<Type::kTimestamp>{
-      Timestamp{-60 * 1000000LL},          // -1 minute from epoch = 23:59
+      Timestamp{-60 * 1000000LL},                        // -1 minute from epoch = 23:59
       Timestamp{-30 * 60 * 1000000LL + 30 * 1000000LL},  // -29.5 minutes = 23:30:30
   });
 
