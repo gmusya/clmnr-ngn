@@ -104,7 +104,29 @@ Column EvaluateContains(std::shared_ptr<Batch> batch, std::shared_ptr<Contains> 
 
 Column EvaluateIn(std::shared_ptr<Batch>, std::shared_ptr<In>) { THROW_NOT_IMPLEMENTED; }
 
-Column EvaluateCase(std::shared_ptr<Batch>, std::shared_ptr<Case>) { THROW_NOT_IMPLEMENTED; }
+Column EvaluateCase(std::shared_ptr<Batch> batch, std::shared_ptr<Case> expression) {
+  Column cond_col = Evaluate(batch, expression->condition);
+  ASSERT(cond_col.GetType() == Type::kBool);
+
+  Column then_col = Evaluate(batch, expression->then_expr);
+  Column else_col = Evaluate(batch, expression->else_expr);
+  ASSERT(then_col.GetType() == else_col.GetType());
+
+  const auto& cond_values = std::get<ArrayType<Type::kBool>>(cond_col.Values());
+
+  return Dispatch(
+      [&]<Type type>(Tag<type>) -> Column {
+        const auto& then_values = std::get<ArrayType<type>>(then_col.Values());
+        const auto& else_values = std::get<ArrayType<type>>(else_col.Values());
+
+        ArrayType<type> result(cond_values.size());
+        for (size_t i = 0; i < cond_values.size(); ++i) {
+          result[i] = cond_values[i].value ? then_values[i] : else_values[i];
+        }
+        return Column(std::move(result));
+      },
+      then_col.GetType());
+}
 
 Column EvaluateRegexReplace(std::shared_ptr<Batch>, std::shared_ptr<RegexReplace>) { THROW_NOT_IMPLEMENTED; }
 
