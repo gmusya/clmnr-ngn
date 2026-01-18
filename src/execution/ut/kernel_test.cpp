@@ -119,10 +119,10 @@ TEST(Kernel, DateTruncMinuteBeforeEpoch) {
   static constexpr int64_t kUsPerSec = 1000000LL;
 
   Column col(ArrayType<Type::kTimestamp>{
-      Timestamp{-1},                // 23:59:59.999999 on 1969-12-31 -> 23:59:00
-      Timestamp{-30 * kUsPerSec},   // 23:59:30 on 1969-12-31 -> 23:59:00
-      Timestamp{-kUsPerMin},        // 23:59:00 on 1969-12-31 -> 23:59:00
-      Timestamp{-kUsPerMin - 1},    // 23:58:59.999999 -> 23:58:00
+      Timestamp{-1},               // 23:59:59.999999 on 1969-12-31 -> 23:59:00
+      Timestamp{-30 * kUsPerSec},  // 23:59:30 on 1969-12-31 -> 23:59:00
+      Timestamp{-kUsPerMin},       // 23:59:00 on 1969-12-31 -> 23:59:00
+      Timestamp{-kUsPerMin - 1},   // 23:58:59.999999 -> 23:58:00
   });
 
   Column result = DateTruncMinute(col);
