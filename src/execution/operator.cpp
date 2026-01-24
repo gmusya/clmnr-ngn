@@ -50,9 +50,24 @@ class ScanStream : public IStream<std::shared_ptr<Batch>> {
       ASSERT_WITH_MESSAGE(it != column_name_to_index_.end(), "Column not found in file: " + field.name);
       columns_to_read_.push_back(it->second);
     }
+
+    for (const auto& pred : op_->zone_map_predicates) {
+      auto it = column_name_to_index_.find(pred.column_name);
+      if (it != column_name_to_index_.end()) {
+        resolved_predicates_.push_back({it->second, pred});
+      }
+    }
   }
 
   std::optional<std::shared_ptr<Batch>> Next() override {
+    while (row_group_index_ < reader_.RowGroupCount()) {
+      if (CanSkipCurrentRowGroup()) {
+        ++row_group_index_;
+        continue;
+      }
+      break;
+    }
+
     if (row_group_index_ >= reader_.RowGroupCount()) {
       return std::nullopt;
     }
@@ -74,12 +89,28 @@ class ScanStream : public IStream<std::shared_ptr<Batch>> {
   }
 
  private:
+  bool CanSkipCurrentRowGroup() const {
+    if (!reader_.HasZoneMaps() || resolved_predicates_.empty()) {
+      return false;
+    }
+
+    for (const auto& [col_idx, pred] : resolved_predicates_) {
+      if (reader_.CanSkipRowGroupForRange(row_group_index_, col_idx, *pred.range_min, *pred.range_max)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   FileReader reader_;
 
   std::shared_ptr<ScanOperator> op_;
 
   std::unordered_map<std::string, size_t> column_name_to_index_;
   std::vector<size_t> columns_to_read_;
+
+  std::vector<std::pair<size_t, ZoneMapPredicate>> resolved_predicates_;
 
   size_t row_group_index_ = 0;
 };

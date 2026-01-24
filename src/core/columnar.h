@@ -10,19 +10,23 @@
 #include "src/core/schema.h"
 #include "src/core/serde.h"
 #include "src/core/type.h"
+#include "src/core/zone_map.h"
 #include "src/util/assert.h"
 #include "src/util/macro.h"
 
 namespace ngn {
 
-static constexpr int64_t kColumnarFooterMagic = 0x434C4D4E52524733;  // "CLMNRRG3"
+// Updated magic number to indicate zone map support
+static constexpr int64_t kColumnarFooterMagic = 0x434C4D4E52524734;  // "CLMNRRG4"
 
 class Metadata {
  public:
-  Metadata(Schema schema, std::vector<int64_t> row_group_offsets, std::vector<int64_t> row_group_row_counts)
+  Metadata(Schema schema, std::vector<int64_t> row_group_offsets, std::vector<int64_t> row_group_row_counts,
+           std::vector<RowGroupZoneMap> zone_maps = {})
       : schema_(std::move(schema)),
         row_group_offsets_(std::move(row_group_offsets)),
-        row_group_row_counts_(std::move(row_group_row_counts)) {}
+        row_group_row_counts_(std::move(row_group_row_counts)),
+        zone_maps_(std::move(zone_maps)) {}
 
   std::string Serialize() const {
     std::stringstream out;
@@ -40,6 +44,14 @@ class Metadata {
 
     for (int64_t row_count : row_group_row_counts_) {
       Write(row_count, out);
+    }
+
+    // Serialize zone maps
+    int64_t zm_count = zone_maps_.size();
+    Write(zm_count, out);
+    for (const auto& zm : zone_maps_) {
+      std::string serialized_zm = zm.Serialize();
+      Write(serialized_zm, out);
     }
 
     return out.str();
@@ -62,17 +74,34 @@ class Metadata {
       row_group_row_counts[i] = Read<int64_t>(in);
     }
 
-    return Metadata(std::move(schema), std::move(row_group_offsets), std::move(row_group_row_counts));
+    // Deserialize zone maps (if present)
+    std::vector<RowGroupZoneMap> zone_maps;
+    if (in.peek() != EOF) {
+      int64_t zm_count = Read<int64_t>(in);
+      zone_maps.reserve(zm_count);
+      for (int64_t i = 0; i < zm_count; ++i) {
+        std::string serialized_zm = Read<std::string>(in);
+        std::stringstream zm_stream(serialized_zm);
+        zone_maps.push_back(RowGroupZoneMap::Deserialize(zm_stream));
+      }
+    }
+
+    return Metadata(std::move(schema), std::move(row_group_offsets), std::move(row_group_row_counts),
+                    std::move(zone_maps));
   }
 
   const Schema& GetSchema() const { return schema_; }
   const std::vector<int64_t>& GetRowGroupOffsets() const { return row_group_offsets_; }
   const std::vector<int64_t>& GetRowGroupRowCounts() const { return row_group_row_counts_; }
+  const std::vector<RowGroupZoneMap>& GetZoneMaps() const { return zone_maps_; }
+
+  bool HasZoneMaps() const { return !zone_maps_.empty(); }
 
  private:
   Schema schema_;
   std::vector<int64_t> row_group_offsets_;
   std::vector<int64_t> row_group_row_counts_;
+  std::vector<RowGroupZoneMap> zone_maps_;
 };
 
 class FileWriter {
@@ -98,6 +127,9 @@ class FileWriter {
     const int64_t row_group_start = output_.tellp();
     row_group_offsets_.emplace_back(row_group_start);
     row_group_row_counts_.emplace_back(row_count);
+
+    // Compute zone map for this row group
+    zone_maps_.push_back(ComputeRowGroupZoneMap(columns));
 
     Write(row_count, output_);
 
@@ -131,7 +163,8 @@ class FileWriter {
 
   void Finalize() && {
     {
-      std::string serialized_metadata = Metadata(schema_, row_group_offsets_, row_group_row_counts_).Serialize();
+      std::string serialized_metadata =
+          Metadata(schema_, row_group_offsets_, row_group_row_counts_, zone_maps_).Serialize();
       Write(serialized_metadata, output_);
 
       int64_t metadata_size = serialized_metadata.size() + sizeof(int64_t);
@@ -159,6 +192,7 @@ class FileWriter {
 
   std::vector<int64_t> row_group_offsets_;
   std::vector<int64_t> row_group_row_counts_;
+  std::vector<RowGroupZoneMap> zone_maps_;
 };
 
 namespace internal {
@@ -209,6 +243,22 @@ class FileReader {
   int64_t RowGroupRowCount(uint64_t row_group_idx) const {
     ASSERT(row_group_idx < RowGroupCount());
     return metadata_.GetRowGroupRowCounts()[row_group_idx];
+  }
+
+  bool HasZoneMaps() const { return metadata_.HasZoneMaps(); }
+
+  const std::vector<RowGroupZoneMap>& GetZoneMaps() const { return metadata_.GetZoneMaps(); }
+
+  bool CanSkipRowGroupForRange(uint64_t row_group_idx, uint64_t column_idx, const Value& min_val,
+                               const Value& max_val) const {
+    if (!HasZoneMaps() || row_group_idx >= metadata_.GetZoneMaps().size()) {
+      return false;
+    }
+    const auto& zm = metadata_.GetZoneMaps()[row_group_idx];
+    if (column_idx >= zm.columns.size()) {
+      return false;
+    }
+    return zm.columns[column_idx].CanSkipForRange(min_val, max_val);
   }
 
   std::vector<Column> ReadRowGroup(uint64_t row_group_idx) const {

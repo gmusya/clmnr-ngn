@@ -1,6 +1,8 @@
 #pragma once
 
 #include <memory>
+#include <optional>
+#include <vector>
 
 #include "src/execution/aggregation.h"
 #include "src/execution/batch.h"
@@ -18,6 +20,21 @@ enum class OperatorType {
   kTopK,
 };
 
+struct ZoneMapPredicate {
+  std::string column_name;
+
+  std::optional<Value> range_min;
+  std::optional<Value> range_max;
+
+  static ZoneMapPredicate Equal(std::string col, const Value& val) {
+    return ZoneMapPredicate{std::move(col), val, val};
+  }
+
+  static ZoneMapPredicate Range(std::string col, const Value& min_val, const Value& max_val) {
+    return ZoneMapPredicate{std::move(col), min_val, max_val};
+  }
+};
+
 struct Operator {
   OperatorType type;
 
@@ -26,13 +43,17 @@ struct Operator {
 };
 
 struct ScanOperator : public Operator {
-  ScanOperator(std::string i, Schema s)
-      : Operator(OperatorType::kScan), input_path(std::move(i)), schema(std::move(s)) {
+  ScanOperator(std::string i, Schema s, std::vector<ZoneMapPredicate> preds = {})
+      : Operator(OperatorType::kScan),
+        input_path(std::move(i)),
+        schema(std::move(s)),
+        zone_map_predicates(std::move(preds)) {
     ASSERT(!input_path.empty());
   }
 
   std::string input_path;
   Schema schema;
+  std::vector<ZoneMapPredicate> zone_map_predicates;  // Predicates for zone map filtering
 };
 
 struct FilterOperator : public Operator {
@@ -116,8 +137,9 @@ struct LimitOperator : public Operator {
 };
 #endif
 
-inline std::shared_ptr<ScanOperator> MakeScan(std::string input_path, Schema schema) {
-  return std::make_shared<ScanOperator>(std::move(input_path), std::move(schema));
+inline std::shared_ptr<ScanOperator> MakeScan(std::string input_path, Schema schema,
+                                              std::vector<ZoneMapPredicate> predicates = {}) {
+  return std::make_shared<ScanOperator>(std::move(input_path), std::move(schema), std::move(predicates));
 }
 
 inline std::shared_ptr<FilterOperator> MakeFilter(std::shared_ptr<Operator> child,
