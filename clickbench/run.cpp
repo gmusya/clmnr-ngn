@@ -791,12 +791,18 @@ class QueryMaker {
                        MakeConst(Value(static_cast<int16_t>(0))))),
         MakeBinary(BinaryFunction::kNotEqual, MakeVariable("URL", Type::kString), MakeConst(Value(std::string("")))));
 
+    // Zone map predicates for CounterID = 62 and EventDate range
+    std::vector<ZoneMapPredicate> zm_preds = {
+        ZoneMapPredicate::Equal("CounterID", Value(static_cast<int32_t>(62))),
+        ZoneMapPredicate::Range("EventDate", Value(Date{15887}), Value(Date{15917}))};
+
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "URL"})),
-                                 filter_cond),
-                      MakeAggregation({AggregationUnit{AggregationType::kCount,
-                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                                      {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "URL"}), zm_preds),
+                       filter_cond),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10);
 
     return QueryInfo{.plan = plan, .name = "Q36"};
@@ -827,12 +833,18 @@ class QueryMaker {
                        MakeConst(Value(static_cast<int16_t>(0))))),
         MakeBinary(BinaryFunction::kNotEqual, MakeVariable("Title", Type::kString), MakeConst(Value(std::string("")))));
 
+    // Zone map predicates for CounterID = 62 and EventDate range
+    std::vector<ZoneMapPredicate> zm_preds = {
+        ZoneMapPredicate::Equal("CounterID", Value(static_cast<int32_t>(62))),
+        ZoneMapPredicate::Range("EventDate", Value(Date{15887}), Value(Date{15917}))};
+
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "Title"})),
-                                 filter_cond),
-                      MakeAggregation({AggregationUnit{AggregationType::kCount,
-                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                                      {GroupByUnit{MakeVariable("Title", Type::kString), "Title"}})),
+        MakeAggregate(
+            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "DontCountHits", "IsRefresh", "Title"}), zm_preds),
+                       filter_cond),
+            MakeAggregation(
+                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                {GroupByUnit{MakeVariable("Title", Type::kString), "Title"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10);
 
     return QueryInfo{.plan = plan, .name = "Q37"};
@@ -864,10 +876,16 @@ class QueryMaker {
         MakeBinary(BinaryFunction::kEqual, MakeVariable("IsDownload", Type::kInt16),
                    MakeConst(Value(static_cast<int16_t>(0)))));
 
+    // Zone map predicates for CounterID = 62 and EventDate range
+    std::vector<ZoneMapPredicate> zm_preds = {
+        ZoneMapPredicate::Equal("CounterID", Value(static_cast<int32_t>(62))),
+        ZoneMapPredicate::Range("EventDate", Value(Date{15887}), Value(Date{15917}))};
+
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "IsLink", "IsDownload", "URL"})),
-                       filter_cond),
+            MakeFilter(
+                MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "IsLink", "IsDownload", "URL"}), zm_preds),
+                filter_cond),
             MakeAggregation(
                 {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
                 {GroupByUnit{MakeVariable("URL", Type::kString), "URL"}})),
@@ -901,25 +919,31 @@ class QueryMaker {
                                      MakeBinary(BinaryFunction::kEqual, MakeVariable("AdvEngineID", Type::kInt16),
                                                 MakeConst(Value(static_cast<int16_t>(0)))));
 
+    // Zone map predicates for CounterID = 62 and EventDate range
+    std::vector<ZoneMapPredicate> zm_preds = {
+        ZoneMapPredicate::Equal("CounterID", Value(static_cast<int32_t>(62))),
+        ZoneMapPredicate::Range("EventDate", Value(Date{15887}), Value(Date{15917}))};
+
     std::shared_ptr<Operator> plan = MakeTopK(
-        MakeAggregate(
-            MakeProject(MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID",
-                                                       "SearchEngineID", "AdvEngineID", "Referer", "URL"})),
-                                   filter_cond),
-                        {ProjectionUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
-                         ProjectionUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
-                         ProjectionUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
-                         ProjectionUnit{MakeCase(case_condition, MakeVariable("Referer", Type::kString),
-                                                 MakeConst(Value(std::string("")))),
-                                        "Src"},
-                         ProjectionUnit{MakeVariable("URL", Type::kString), "Dst"}}),
-            MakeAggregation(
-                {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
-                {GroupByUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
-                 GroupByUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
-                 GroupByUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
-                 GroupByUnit{MakeVariable("Src", Type::kString), "Src"},
-                 GroupByUnit{MakeVariable("Dst", Type::kString), "Dst"}})),
+        MakeAggregate(MakeProject(MakeFilter(MakeScan(input_,
+                                                      S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID",
+                                                         "SearchEngineID", "AdvEngineID", "Referer", "URL"}),
+                                                      zm_preds),
+                                             filter_cond),
+                                  {ProjectionUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
+                                   ProjectionUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
+                                   ProjectionUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
+                                   ProjectionUnit{MakeCase(case_condition, MakeVariable("Referer", Type::kString),
+                                                           MakeConst(Value(std::string("")))),
+                                                  "Src"},
+                                   ProjectionUnit{MakeVariable("URL", Type::kString), "Dst"}}),
+                      MakeAggregation({AggregationUnit{AggregationType::kCount,
+                                                       MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
+                                      {GroupByUnit{MakeVariable("TraficSourceID", Type::kInt16), "TraficSourceID"},
+                                       GroupByUnit{MakeVariable("SearchEngineID", Type::kInt16), "SearchEngineID"},
+                                       GroupByUnit{MakeVariable("AdvEngineID", Type::kInt16), "AdvEngineID"},
+                                       GroupByUnit{MakeVariable("Src", Type::kString), "Src"},
+                                       GroupByUnit{MakeVariable("Dst", Type::kString), "Dst"}})),
         {SortUnit{MakeVariable("PageViews", Type::kInt64), false}}, 10, 1000);
 
     return QueryInfo{.plan = plan, .name = "Q39"};
@@ -954,11 +978,17 @@ class QueryMaker {
         MakeBinary(BinaryFunction::kEqual, MakeVariable("RefererHash", Type::kInt64),
                    MakeConst(Value(static_cast<int64_t>(3594120000172545465LL)))));
 
+    // Zone map predicates for CounterID = 62 and EventDate range
+    std::vector<ZoneMapPredicate> zm_preds = {
+        ZoneMapPredicate::Equal("CounterID", Value(static_cast<int32_t>(62))),
+        ZoneMapPredicate::Range("EventDate", Value(Date{15887}), Value(Date{15917}))};
+
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_,
-                                S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID", "RefererHash", "URLHash"})),
-                       filter_cond),
+            MakeFilter(
+                MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "TraficSourceID", "RefererHash", "URLHash"}),
+                         zm_preds),
+                filter_cond),
             MakeAggregation(
                 {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
                 {GroupByUnit{MakeVariable("URLHash", Type::kInt64), "URLHash"},
@@ -994,10 +1024,17 @@ class QueryMaker {
         MakeBinary(BinaryFunction::kEqual, MakeVariable("URLHash", Type::kInt64),
                    MakeConst(Value(static_cast<int64_t>(2868770270353813622LL)))));
 
+    // Zone map predicates for CounterID = 62 and EventDate range
+    std::vector<ZoneMapPredicate> zm_preds = {
+        ZoneMapPredicate::Equal("CounterID", Value(static_cast<int32_t>(62))),
+        ZoneMapPredicate::Range("EventDate", Value(Date{15887}), Value(Date{15917}))};
+
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
-            MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "DontCountHits", "URLHash",
-                                           "WindowClientWidth", "WindowClientHeight"})),
+            MakeFilter(MakeScan(input_,
+                                S({"CounterID", "EventDate", "IsRefresh", "DontCountHits", "URLHash",
+                                   "WindowClientWidth", "WindowClientHeight"}),
+                                zm_preds),
                        filter_cond),
             MakeAggregation(
                 {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "PageViews"}},
@@ -1030,10 +1067,16 @@ class QueryMaker {
         MakeBinary(BinaryFunction::kEqual, MakeVariable("DontCountHits", Type::kInt16),
                    MakeConst(Value(static_cast<int16_t>(0)))));
 
+    // Zone map predicates for CounterID = 62 and EventDate range (2013-07-14 to 2013-07-15)
+    std::vector<ZoneMapPredicate> zm_preds = {
+        ZoneMapPredicate::Equal("CounterID", Value(static_cast<int32_t>(62))),
+        ZoneMapPredicate::Range("EventDate", Value(Date{15900}), Value(Date{15901}))};
+
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeAggregate(
             MakeProject(
-                MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "DontCountHits", "EventTime"})),
+                MakeFilter(MakeScan(input_, S({"CounterID", "EventDate", "IsRefresh", "DontCountHits", "EventTime"}),
+                                    zm_preds),
                            filter_cond),
                 {ProjectionUnit{MakeUnary(UnaryFunction::kDateTruncMinute, MakeVariable("EventTime", Type::kTimestamp)),
                                 "M"}}),
