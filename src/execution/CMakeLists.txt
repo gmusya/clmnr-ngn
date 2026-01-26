@@ -2,6 +2,7 @@ add_library(ngn-exec STATIC
   expression.cpp
   kernel.cpp
   aggregation_executor.cpp
+  aggregation_executor_compact.cpp
   operator.cpp
 )
 

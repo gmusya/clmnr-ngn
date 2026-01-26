@@ -7,6 +7,7 @@
 
 #include "src/core/columnar.h"
 #include "src/execution/aggregation_executor.h"
+#include "src/execution/aggregation_executor_compact.h"
 #include "src/execution/batch.h"
 #include "src/execution/stream.h"
 #include "src/util/assert.h"
@@ -33,6 +34,26 @@ class AggregationStream : public IStream<std::shared_ptr<Batch>> {
   bool first_ = true;
 
   std::shared_ptr<AggregateOperator> op_;
+};
+
+class CompactAggregationStream : public IStream<std::shared_ptr<Batch>> {
+ public:
+  CompactAggregationStream(std::shared_ptr<CompactAggregateOperator> aggregation) : op_(std::move(aggregation)) {}
+
+  std::optional<std::shared_ptr<Batch>> Next() override {
+    if (first_) {
+      first_ = false;
+
+      auto stream = Execute(op_->child);
+      return EvaluateCompact(stream, op_->aggregation);
+    }
+
+    return std::nullopt;
+  }
+
+ private:
+  bool first_ = true;
+  std::shared_ptr<CompactAggregateOperator> op_;
 };
 
 class ScanStream : public IStream<std::shared_ptr<Batch>> {
@@ -431,6 +452,8 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
   switch (op->type) {
     case OperatorType::kAggregate:
       return std::make_shared<AggregationStream>(std::static_pointer_cast<AggregateOperator>(op));
+    case OperatorType::kAggregateCompact:
+      return std::make_shared<CompactAggregationStream>(std::static_pointer_cast<CompactAggregateOperator>(op));
     case OperatorType::kScan:
       return std::make_shared<ScanStream>(std::static_pointer_cast<ScanOperator>(op));
     case OperatorType::kFilter:

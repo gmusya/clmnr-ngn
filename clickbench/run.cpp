@@ -689,7 +689,7 @@ class QueryMaker {
 
     std::shared_ptr<Operator> plan = MakeTopK(
         MakeProject(
-            MakeAggregate(
+            MakeAggregateCompact(
                 MakeScan(input_, S({"WatchID", "ClientIP", "IsRefresh", "ResolutionWidth"})),
                 MakeAggregation(
                     {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"},

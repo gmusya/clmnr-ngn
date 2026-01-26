@@ -16,6 +16,7 @@ enum class OperatorType {
   kFilter,
   kProject,
   kAggregate,
+  kAggregateCompact,
   kSort,
   kTopK,
 };
@@ -95,6 +96,20 @@ struct AggregateOperator : public Operator {
   std::shared_ptr<Aggregation> aggregation;
 };
 
+// Memory-lean alternative to AggregateOperator. Intended to be used selectively for
+// very high-cardinality aggregations (e.g. ClickBench Q32).
+struct CompactAggregateOperator : public Operator {
+  CompactAggregateOperator(std::shared_ptr<Operator> chi, std::shared_ptr<Aggregation> aggr)
+      : Operator(OperatorType::kAggregateCompact), child(std::move(chi)), aggregation(std::move(aggr)) {
+    ASSERT(child != nullptr);
+    ASSERT(aggregation != nullptr);
+    ASSERT(!aggregation->aggregations.empty());
+  }
+
+  std::shared_ptr<Operator> child;
+  std::shared_ptr<Aggregation> aggregation;
+};
+
 struct SortUnit {
   std::shared_ptr<Expression> expression;
   bool is_ascending;
@@ -155,6 +170,11 @@ inline std::shared_ptr<ProjectOperator> MakeProject(std::shared_ptr<Operator> ch
 inline std::shared_ptr<AggregateOperator> MakeAggregate(std::shared_ptr<Operator> child,
                                                         std::shared_ptr<Aggregation> aggregation) {
   return std::make_shared<AggregateOperator>(std::move(child), std::move(aggregation));
+}
+
+inline std::shared_ptr<CompactAggregateOperator> MakeAggregateCompact(std::shared_ptr<Operator> child,
+                                                                      std::shared_ptr<Aggregation> aggregation) {
+  return std::make_shared<CompactAggregateOperator>(std::move(child), std::move(aggregation));
 }
 
 inline std::shared_ptr<SortOperator> MakeSort(std::shared_ptr<Operator> child, std::vector<SortUnit> sort_keys) {
