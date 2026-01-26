@@ -597,25 +597,29 @@ class QueryMaker {
   QueryInfo MakeQ29() {
     // SELECT SUM(ResolutionWidth), SUM(ResolutionWidth + 1), ..., SUM(ResolutionWidth + 89) FROM hits;
 
-    std::vector<ProjectionUnit> projections;
-    std::vector<AggregationUnit> aggregations;
+    std::vector<AggregationUnit> aggregations{
+        AggregationUnit{AggregationType::kSum, MakeVariable("ResolutionWidth", Type::kInt16), "sum_width"},
+        AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"},
+    };
 
+    std::vector<ProjectionUnit> projections;
+    projections.reserve(90);
     for (int i = 0; i < 90; ++i) {
-      std::string col_name = "s" + std::to_string(i);
+      std::string out_name = "s" + std::to_string(i);
       if (i == 0) {
-        projections.push_back(ProjectionUnit{MakeVariable("ResolutionWidth", Type::kInt16), col_name});
-      } else {
-        projections.push_back(
-            ProjectionUnit{MakeBinary(BinaryFunction::kAdd, MakeVariable("ResolutionWidth", Type::kInt16),
-                                      MakeConst(Value(static_cast<int16_t>(i)))),
-                           col_name});
+        projections.push_back(ProjectionUnit{MakeVariable("sum_width", Type::kInt64), out_name});
+        continue;
       }
-      aggregations.push_back(AggregationUnit{AggregationType::kSum, MakeVariable(col_name, Type::kInt16), col_name});
+
+      projections.push_back(ProjectionUnit{MakeBinary(BinaryFunction::kAdd, MakeVariable("sum_width", Type::kInt64),
+                                                      MakeBinary(BinaryFunction::kMult, MakeVariable("c", Type::kInt64),
+                                                                 MakeConst(Value(static_cast<int64_t>(i))))),
+                                           out_name});
     }
 
-    std::shared_ptr<Operator> plan =
-        MakeAggregate(MakeProject(MakeScan(input_, S({"ResolutionWidth"})), std::move(projections)),
-                      MakeAggregation(std::move(aggregations), {}));
+    std::shared_ptr<Operator> plan = MakeProject(
+        MakeAggregate(MakeScan(input_, S({"ResolutionWidth"})), MakeAggregation(std::move(aggregations), {})),
+        std::move(projections));
 
     return QueryInfo{.plan = plan, .name = "Q29"};
   }
