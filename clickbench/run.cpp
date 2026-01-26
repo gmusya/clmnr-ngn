@@ -735,7 +735,6 @@ class QueryMaker {
     // SELECT ClientIP, ClientIP - 1, ClientIP - 2, ClientIP - 3, COUNT(*) AS c FROM hits GROUP BY ClientIP, ClientIP -
     // 1, ClientIP - 2, ClientIP - 3 ORDER BY c DESC LIMIT 10;
 
-    // Compute TOPK on (ClientIP, c) first, then derive ClientIP-1/2/3 on the top-10 result.
     std::shared_ptr<Operator> plan = MakeProject(
         MakeTopK(MakeAggregate(MakeScan(input_, S({"ClientIP"})),
                                MakeAggregation({AggregationUnit{AggregationType::kCount,
