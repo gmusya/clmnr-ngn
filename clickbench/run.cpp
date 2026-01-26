@@ -10,13 +10,11 @@
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
-#include "absl/log/initialize.h"
 #include "absl/log/log.h"
 #include "src/core/csv.h"
 #include "src/execution/aggregation.h"
 #include "src/execution/expression.h"
 #include "src/execution/operator.h"
-#include "src/util/macro.h"
 
 ABSL_FLAG(std::string, input, "", "Input columnar file (.clmnr)");
 ABSL_FLAG(std::string, schema, "", "Schema file (.schema)");
@@ -737,32 +735,24 @@ class QueryMaker {
     // SELECT ClientIP, ClientIP - 1, ClientIP - 2, ClientIP - 3, COUNT(*) AS c FROM hits GROUP BY ClientIP, ClientIP -
     // 1, ClientIP - 2, ClientIP - 3 ORDER BY c DESC LIMIT 10;
 
-    std::shared_ptr<Operator> plan = MakeTopK(
-        MakeProject(
-            MakeAggregate(
-                MakeProject(MakeScan(input_, S({"ClientIP"})),
-                            {ProjectionUnit{MakeVariable("ClientIP", Type::kInt32), "ClientIP"},
-                             ProjectionUnit{MakeBinary(BinaryFunction::kSub, MakeVariable("ClientIP", Type::kInt32),
-                                                       MakeConst(Value(static_cast<int32_t>(1)))),
-                                            "ClientIP_1"},
-                             ProjectionUnit{MakeBinary(BinaryFunction::kSub, MakeVariable("ClientIP", Type::kInt32),
-                                                       MakeConst(Value(static_cast<int32_t>(2)))),
-                                            "ClientIP_2"},
-                             ProjectionUnit{MakeBinary(BinaryFunction::kSub, MakeVariable("ClientIP", Type::kInt32),
-                                                       MakeConst(Value(static_cast<int32_t>(3)))),
-                                            "ClientIP_3"}}),
-                MakeAggregation(
-                    {AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "c"}},
-                    {GroupByUnit{MakeVariable("ClientIP", Type::kInt32), "ClientIP"},
-                     GroupByUnit{MakeVariable("ClientIP_1", Type::kInt32), "ClientIP_1"},
-                     GroupByUnit{MakeVariable("ClientIP_2", Type::kInt32), "ClientIP_2"},
-                     GroupByUnit{MakeVariable("ClientIP_3", Type::kInt32), "ClientIP_3"}})),
-            {ProjectionUnit{MakeVariable("ClientIP", Type::kInt32), "ClientIP"},
-             ProjectionUnit{MakeVariable("ClientIP_1", Type::kInt32), "ClientIP_1"},
-             ProjectionUnit{MakeVariable("ClientIP_2", Type::kInt32), "ClientIP_2"},
-             ProjectionUnit{MakeVariable("ClientIP_3", Type::kInt32), "ClientIP_3"},
-             ProjectionUnit{MakeVariable("c", Type::kInt64), "c"}}),
-        {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10);
+    // Compute TOPK on (ClientIP, c) first, then derive ClientIP-1/2/3 on the top-10 result.
+    std::shared_ptr<Operator> plan = MakeProject(
+        MakeTopK(MakeAggregate(MakeScan(input_, S({"ClientIP"})),
+                               MakeAggregation({AggregationUnit{AggregationType::kCount,
+                                                                MakeConst(Value(static_cast<int64_t>(0))), "c"}},
+                                              {GroupByUnit{MakeVariable("ClientIP", Type::kInt32), "ClientIP"}})),
+                 {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10),
+        {ProjectionUnit{MakeVariable("ClientIP", Type::kInt32), "ClientIP"},
+         ProjectionUnit{MakeBinary(BinaryFunction::kSub, MakeVariable("ClientIP", Type::kInt32),
+                                   MakeConst(Value(static_cast<int32_t>(1)))),
+                        "ClientIP_1"},
+         ProjectionUnit{MakeBinary(BinaryFunction::kSub, MakeVariable("ClientIP", Type::kInt32),
+                                   MakeConst(Value(static_cast<int32_t>(2)))),
+                        "ClientIP_2"},
+         ProjectionUnit{MakeBinary(BinaryFunction::kSub, MakeVariable("ClientIP", Type::kInt32),
+                                   MakeConst(Value(static_cast<int32_t>(3)))),
+                        "ClientIP_3"},
+         ProjectionUnit{MakeVariable("c", Type::kInt64), "c"}});
 
     return QueryInfo{.plan = plan, .name = "Q35"};
   }
