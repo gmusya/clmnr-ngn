@@ -403,8 +403,12 @@ class QueryMaker {
   QueryInfo MakeQ19() {
     // SELECT UserID FROM hits WHERE UserID = 435090932899640449;
 
+    std::vector<ZoneMapPredicate> zm_preds = {
+        ZoneMapPredicate::Equal("UserID", Value(static_cast<int64_t>(435090932899640449LL))),
+    };
+
     std::shared_ptr<Operator> plan =
-        MakeProject(MakeFilter(MakeScan(input_, S({"UserID"})),
+        MakeProject(MakeFilter(MakeScan(input_, S({"UserID"}), std::move(zm_preds)),
                                MakeBinary(BinaryFunction::kEqual, MakeVariable("UserID", Type::kInt64),
                                           MakeConst(Value(static_cast<int64_t>(435090932899640449LL))))),
                     {ProjectionUnit{MakeVariable("UserID", Type::kInt64), "UserID"}});
