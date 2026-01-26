@@ -739,7 +739,7 @@ class QueryMaker {
         MakeTopK(MakeAggregate(MakeScan(input_, S({"ClientIP"})),
                                MakeAggregation({AggregationUnit{AggregationType::kCount,
                                                                 MakeConst(Value(static_cast<int64_t>(0))), "c"}},
-                                              {GroupByUnit{MakeVariable("ClientIP", Type::kInt32), "ClientIP"}})),
+                                               {GroupByUnit{MakeVariable("ClientIP", Type::kInt32), "ClientIP"}})),
                  {SortUnit{MakeVariable("c", Type::kInt64), false}}, 10),
         {ProjectionUnit{MakeVariable("ClientIP", Type::kInt32), "ClientIP"},
          ProjectionUnit{MakeBinary(BinaryFunction::kSub, MakeVariable("ClientIP", Type::kInt32),
