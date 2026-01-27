@@ -109,10 +109,7 @@ class QueryMaker {
   QueryInfo MakeQ0() {
     // SELECT COUNT(*) FROM hits;
 
-    std::shared_ptr<Operator> plan = MakeAggregate(
-        MakeScan(input_, Schema({})),
-        MakeAggregation({AggregationUnit{AggregationType::kCount, MakeConst(Value(static_cast<int64_t>(0))), "count"}},
-                        {}));
+    std::shared_ptr<Operator> plan = MakeCountTable(input_, "count");
 
     return QueryInfo{.plan = plan, .name = "Q0"};
   }
