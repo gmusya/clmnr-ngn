@@ -1,6 +1,7 @@
 #include "src/execution/kernel.h"
 
 #include <functional>
+#include <limits>
 #include <regex>
 
 #include "src/core/type.h"
@@ -10,6 +11,43 @@
 namespace ngn {
 
 namespace internal {
+
+template <Type type>
+PhysicalType<type> Min(const ArrayType<type>& arr) {
+  ASSERT(!arr.empty());
+  PhysicalType<type> best = arr[0];
+  for (size_t i = 1; i < arr.size(); ++i) {
+    if (arr[i] < best) {
+      best = arr[i];
+    }
+  }
+  return best;
+}
+
+template <Type type>
+PhysicalType<type> Max(const ArrayType<type>& arr) {
+  ASSERT(!arr.empty());
+  PhysicalType<type> best = arr[0];
+  for (size_t i = 1; i < arr.size(); ++i) {
+    if (arr[i] > best) {
+      best = arr[i];
+    }
+  }
+  return best;
+}
+
+template <Type type>
+Int128 SumToInt128(const ArrayType<type>& arr) {
+  Int128 sum = static_cast<Int128>(0);
+  for (const auto& v : arr) {
+    if constexpr (type == Type::kInt128) {
+      sum += v;
+    } else {
+      sum += static_cast<Int128>(v);
+    }
+  }
+  return sum;
+}
 
 template <Type type>
 ArrayType<type> Add(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
@@ -137,6 +175,43 @@ ArrayType<Type::kBool> GreaterOrEqual(const ArrayType<type>& lhs, const ArrayTyp
 }
 
 }  // namespace internal
+
+Value ReduceSum(const Column& operand, Type output_type) {
+  return Dispatch(
+      [&]<Type type>(Tag<type>) -> Value {
+        if constexpr (type == Type::kInt16 || type == Type::kInt32 || type == Type::kInt64 || type == Type::kInt128) {
+          Int128 sum = internal::SumToInt128(std::get<ArrayType<type>>(operand.Values()));
+          if (output_type == Type::kInt128) {
+            return Value(sum);
+          }
+          if (output_type == Type::kInt64) {
+            if (sum > static_cast<Int128>(std::numeric_limits<int64_t>::max()) ||
+                sum < static_cast<Int128>(std::numeric_limits<int64_t>::min())) {
+              THROW_RUNTIME_ERROR("Overlflow");
+            }
+            return Value(static_cast<int64_t>(sum));
+          }
+          THROW_NOT_IMPLEMENTED;
+        } else {
+          THROW_NOT_IMPLEMENTED;
+        }
+      },
+      operand.GetType());
+}
+
+Value ReduceMin(const Column& operand) {
+  ASSERT(operand.Size() > 0);
+  return Dispatch(
+      [&]<Type type>(Tag<type>) -> Value { return Value(internal::Min(std::get<ArrayType<type>>(operand.Values()))); },
+      operand.GetType());
+}
+
+Value ReduceMax(const Column& operand) {
+  ASSERT(operand.Size() > 0);
+  return Dispatch(
+      [&]<Type type>(Tag<type>) -> Value { return Value(internal::Max(std::get<ArrayType<type>>(operand.Values()))); },
+      operand.GetType());
+}
 
 Column Add(const Column& lhs, const Column& rhs) {
   ASSERT(lhs.GetType() == rhs.GetType());

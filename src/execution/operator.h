@@ -14,6 +14,7 @@ namespace ngn {
 enum class OperatorType {
   kScan,
   kCountTable,
+  kGlobalAggregation,
   kConcat,
   kFilter,
   kProject,
@@ -72,9 +73,25 @@ struct CountTableOperator : public Operator {
   std::string output_name;
 };
 
+// Computes aggregations without GROUP BY (single global group).
+// Produces a single-row batch with one column per aggregation.
+struct GlobalAggregationOperator : public Operator {
+  GlobalAggregationOperator(std::shared_ptr<Operator> chi, std::vector<AggregationUnit> aggrs)
+      : Operator(OperatorType::kGlobalAggregation), child(std::move(chi)), aggregations(std::move(aggrs)) {
+    ASSERT(child != nullptr);
+    ASSERT(!aggregations.empty());
+    for (const auto& a : aggregations) {
+      ASSERT(a.expression != nullptr);
+      ASSERT(!a.name.empty());
+    }
+  }
+
+  std::shared_ptr<Operator> child;
+  std::vector<AggregationUnit> aggregations;
+};
+
 // Horizontally concatenates the output columns of multiple child plans.
-// Intended for cases where each child produces a single batch with the same row count
-// (e.g. combining multiple scalar aggregates into one row).
+// Expects each child to produce a single batch with the same number of rows.
 struct ConcatOperator : public Operator {
   explicit ConcatOperator(std::vector<std::shared_ptr<Operator>> ch)
       : Operator(OperatorType::kConcat), children(std::move(ch)) {
@@ -189,6 +206,11 @@ inline std::shared_ptr<ScanOperator> MakeScan(std::string input_path, Schema sch
 
 inline std::shared_ptr<CountTableOperator> MakeCountTable(std::string input_path, std::string output_name = "count") {
   return std::make_shared<CountTableOperator>(std::move(input_path), std::move(output_name));
+}
+
+inline std::shared_ptr<GlobalAggregationOperator> MakeGlobalAggregation(std::shared_ptr<Operator> child,
+                                                                        std::vector<AggregationUnit> aggregations) {
+  return std::make_shared<GlobalAggregationOperator>(std::move(child), std::move(aggregations));
 }
 
 inline std::shared_ptr<ConcatOperator> MakeConcat(std::vector<std::shared_ptr<Operator>> children) {
