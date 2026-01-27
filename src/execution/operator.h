@@ -14,6 +14,7 @@ namespace ngn {
 enum class OperatorType {
   kScan,
   kCountTable,
+  kConcat,
   kFilter,
   kProject,
   kAggregate,
@@ -69,6 +70,21 @@ struct CountTableOperator : public Operator {
 
   std::string input_path;
   std::string output_name;
+};
+
+// Horizontally concatenates the output columns of multiple child plans.
+// Intended for cases where each child produces a single batch with the same row count
+// (e.g. combining multiple scalar aggregates into one row).
+struct ConcatOperator : public Operator {
+  explicit ConcatOperator(std::vector<std::shared_ptr<Operator>> ch)
+      : Operator(OperatorType::kConcat), children(std::move(ch)) {
+    ASSERT(!children.empty());
+    for (const auto& c : children) {
+      ASSERT(c != nullptr);
+    }
+  }
+
+  std::vector<std::shared_ptr<Operator>> children;
 };
 
 struct FilterOperator : public Operator {
@@ -173,6 +189,10 @@ inline std::shared_ptr<ScanOperator> MakeScan(std::string input_path, Schema sch
 
 inline std::shared_ptr<CountTableOperator> MakeCountTable(std::string input_path, std::string output_name = "count") {
   return std::make_shared<CountTableOperator>(std::move(input_path), std::move(output_name));
+}
+
+inline std::shared_ptr<ConcatOperator> MakeConcat(std::vector<std::shared_ptr<Operator>> children) {
+  return std::make_shared<ConcatOperator>(std::move(children));
 }
 
 inline std::shared_ptr<FilterOperator> MakeFilter(std::shared_ptr<Operator> child,

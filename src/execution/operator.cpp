@@ -167,6 +167,57 @@ class CountTableStream : public IStream<std::shared_ptr<Batch>> {
   std::shared_ptr<CountTableOperator> op_;
 };
 
+class ConcatStream : public IStream<std::shared_ptr<Batch>> {
+ public:
+  explicit ConcatStream(std::shared_ptr<ConcatOperator> op) : op_(std::move(op)) {
+    streams_.reserve(op_->children.size());
+    for (const auto& child : op_->children) {
+      streams_.emplace_back(Execute(child));
+    }
+  }
+
+  std::optional<std::shared_ptr<Batch>> Next() override {
+    if (returned_) {
+      return std::nullopt;
+    }
+    returned_ = true;
+
+    std::optional<int64_t> expected_rows;
+    std::vector<Column> out_columns;
+    std::vector<Field> out_fields;
+
+    for (size_t i = 0; i < streams_.size(); ++i) {
+      auto batch_opt = streams_[i]->Next();
+      ASSERT_WITH_MESSAGE(batch_opt.has_value(), "Concat child produced no batches");
+
+      // For now, Concat is a strict "single batch per child" operator.
+      ASSERT_WITH_MESSAGE(!streams_[i]->Next().has_value(), "Concat child produced more than one batch");
+
+      std::shared_ptr<Batch> batch = batch_opt.value();
+      if (!expected_rows.has_value()) {
+        expected_rows = batch->Rows();
+      } else {
+        ASSERT_WITH_MESSAGE(batch->Rows() == expected_rows.value(), "Concat children must have equal row count");
+      }
+
+      for (const auto& f : batch->GetSchema().Fields()) {
+        out_fields.emplace_back(f);
+      }
+      for (const auto& c : batch->Columns()) {
+        out_columns.emplace_back(c);
+      }
+    }
+
+    ASSERT(expected_rows.has_value());
+    return std::make_shared<Batch>(std::move(out_columns), Schema(std::move(out_fields)));
+  }
+
+ private:
+  bool returned_ = false;
+  std::shared_ptr<ConcatOperator> op_;
+  std::vector<std::shared_ptr<IStream<std::shared_ptr<Batch>>>> streams_;
+};
+
 class FilterStream : public IStream<std::shared_ptr<Batch>> {
  public:
   FilterStream(std::shared_ptr<FilterOperator> filter) : op_(std::move(filter)) { stream_ = Execute(op_->child); }
@@ -489,6 +540,8 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
       return std::make_shared<ScanStream>(std::static_pointer_cast<ScanOperator>(op));
     case OperatorType::kCountTable:
       return std::make_shared<CountTableStream>(std::static_pointer_cast<CountTableOperator>(op));
+    case OperatorType::kConcat:
+      return std::make_shared<ConcatStream>(std::static_pointer_cast<ConcatOperator>(op));
     case OperatorType::kFilter:
       return std::make_shared<FilterStream>(std::static_pointer_cast<FilterOperator>(op));
     case OperatorType::kProject:
