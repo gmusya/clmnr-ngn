@@ -136,6 +136,37 @@ class ScanStream : public IStream<std::shared_ptr<Batch>> {
   size_t row_group_index_ = 0;
 };
 
+class CountTableStream : public IStream<std::shared_ptr<Batch>> {
+ public:
+  explicit CountTableStream(std::shared_ptr<CountTableOperator> op) : reader_(op->input_path), op_(std::move(op)) {}
+
+  std::optional<std::shared_ptr<Batch>> Next() override {
+    if (returned_) {
+      return std::nullopt;
+    }
+    returned_ = true;
+
+    int64_t total_rows = 0;
+    for (uint64_t i = 0; i < reader_.RowGroupCount(); ++i) {
+      total_rows += reader_.RowGroupRowCount(i);
+    }
+
+    ArrayType<Type::kInt64> values;
+    values.emplace_back(total_rows);
+
+    std::vector<Column> columns;
+    columns.emplace_back(std::move(values));
+
+    Schema schema({Field{.name = op_->output_name, .type = Type::kInt64}});
+    return std::make_shared<Batch>(std::move(columns), std::move(schema));
+  }
+
+ private:
+  bool returned_ = false;
+  FileReader reader_;
+  std::shared_ptr<CountTableOperator> op_;
+};
+
 class FilterStream : public IStream<std::shared_ptr<Batch>> {
  public:
   FilterStream(std::shared_ptr<FilterOperator> filter) : op_(std::move(filter)) { stream_ = Execute(op_->child); }
@@ -456,6 +487,8 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
       return std::make_shared<CompactAggregationStream>(std::static_pointer_cast<CompactAggregateOperator>(op));
     case OperatorType::kScan:
       return std::make_shared<ScanStream>(std::static_pointer_cast<ScanOperator>(op));
+    case OperatorType::kCountTable:
+      return std::make_shared<CountTableStream>(std::static_pointer_cast<CountTableOperator>(op));
     case OperatorType::kFilter:
       return std::make_shared<FilterStream>(std::static_pointer_cast<FilterOperator>(op));
     case OperatorType::kProject:

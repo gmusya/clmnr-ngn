@@ -13,6 +13,7 @@ namespace ngn {
 
 enum class OperatorType {
   kScan,
+  kCountTable,
   kFilter,
   kProject,
   kAggregate,
@@ -55,6 +56,19 @@ struct ScanOperator : public Operator {
   std::string input_path;
   Schema schema;
   std::vector<ZoneMapPredicate> zone_map_predicates;  // Predicates for zone map filtering
+};
+
+// Returns a single-row, single-column batch containing the number of rows in the table.
+// Intended as a metadata-only fast path for queries like: SELECT COUNT(*) FROM hits;
+struct CountTableOperator : public Operator {
+  explicit CountTableOperator(std::string i, std::string out_name = "count")
+      : Operator(OperatorType::kCountTable), input_path(std::move(i)), output_name(std::move(out_name)) {
+    ASSERT(!input_path.empty());
+    ASSERT(!output_name.empty());
+  }
+
+  std::string input_path;
+  std::string output_name;
 };
 
 struct FilterOperator : public Operator {
@@ -155,6 +169,10 @@ struct LimitOperator : public Operator {
 inline std::shared_ptr<ScanOperator> MakeScan(std::string input_path, Schema schema,
                                               std::vector<ZoneMapPredicate> predicates = {}) {
   return std::make_shared<ScanOperator>(std::move(input_path), std::move(schema), std::move(predicates));
+}
+
+inline std::shared_ptr<CountTableOperator> MakeCountTable(std::string input_path, std::string output_name = "count") {
+  return std::make_shared<CountTableOperator>(std::move(input_path), std::move(output_name));
 }
 
 inline std::shared_ptr<FilterOperator> MakeFilter(std::shared_ptr<Operator> child,
