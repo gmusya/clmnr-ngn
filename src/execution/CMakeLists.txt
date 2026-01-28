@@ -15,8 +15,8 @@ add_executable(ngn-exec-test
   ut/aggregation_test.cpp
   ut/batch_test.cpp
   ut/expression_test.cpp
+  ut/global_aggregation_test.cpp
   ut/kernel_test.cpp
-  ut/operator_test.cpp
 )
 
 target_link_libraries(ngn-exec-test PUBLIC ngn-exec GTest::gtest_main)

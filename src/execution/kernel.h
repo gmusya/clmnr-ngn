@@ -3,6 +3,8 @@
 #include <string>
 
 #include "src/core/column.h"
+#include "src/core/type.h"
+#include "src/core/value.h"
 
 namespace ngn {
 
@@ -10,6 +12,11 @@ Column Add(const Column&, const Column&);
 Column Sub(const Column&, const Column&);
 Column Mult(const Column&, const Column&);
 Column Div(const Column&, const Column&);
+
+// Reduction kernels (return a single scalar value)
+Value ReduceSum(const Column& operand, Type output_type);
+Value ReduceMin(const Column& operand);
+Value ReduceMax(const Column& operand);
 
 Column And(const Column& lhs, const Column& rhs);
 Column Or(const Column& lhs, const Column& rhs);

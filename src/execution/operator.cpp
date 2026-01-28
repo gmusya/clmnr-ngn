@@ -4,11 +4,13 @@
 #include <numeric>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "src/core/columnar.h"
 #include "src/execution/aggregation_executor.h"
 #include "src/execution/aggregation_executor_compact.h"
 #include "src/execution/batch.h"
+#include "src/execution/kernel.h"
 #include "src/execution/stream.h"
 #include "src/util/assert.h"
 #include "src/util/macro.h"
@@ -189,8 +191,6 @@ class ConcatStream : public IStream<std::shared_ptr<Batch>> {
     for (size_t i = 0; i < streams_.size(); ++i) {
       auto batch_opt = streams_[i]->Next();
       ASSERT_WITH_MESSAGE(batch_opt.has_value(), "Concat child produced no batches");
-
-      // For now, Concat is a strict "single batch per child" operator.
       ASSERT_WITH_MESSAGE(!streams_[i]->Next().has_value(), "Concat child produced more than one batch");
 
       std::shared_ptr<Batch> batch = batch_opt.value();
@@ -216,6 +216,223 @@ class ConcatStream : public IStream<std::shared_ptr<Batch>> {
   bool returned_ = false;
   std::shared_ptr<ConcatOperator> op_;
   std::vector<std::shared_ptr<IStream<std::shared_ptr<Batch>>>> streams_;
+};
+
+namespace {
+
+struct ValueHash {
+  size_t operator()(const Value& v) const {
+    return std::visit(
+        []<typename T>(const T& x) -> size_t {
+          using V = std::decay_t<T>;
+          if constexpr (std::is_same_v<V, Boolean>) {
+            return std::hash<bool>{}(x.value);
+          } else if constexpr (std::is_same_v<V, int16_t>) {
+            return std::hash<int16_t>{}(x);
+          } else if constexpr (std::is_same_v<V, int32_t>) {
+            return std::hash<int32_t>{}(x);
+          } else if constexpr (std::is_same_v<V, int64_t>) {
+            return std::hash<int64_t>{}(x);
+          } else if constexpr (std::is_same_v<V, Int128>) {
+            const auto u = static_cast<__uint128_t>(x);
+            const uint64_t lo = static_cast<uint64_t>(u);
+            const uint64_t hi = static_cast<uint64_t>(u >> 64);
+            size_t h = std::hash<uint64_t>{}(lo);
+            h ^= std::hash<uint64_t>{}(hi) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+            return h;
+          } else if constexpr (std::is_same_v<V, std::string>) {
+            return std::hash<std::string>{}(x);
+          } else if constexpr (std::is_same_v<V, Date>) {
+            return std::hash<int64_t>{}(x.value);
+          } else if constexpr (std::is_same_v<V, Timestamp>) {
+            return std::hash<int64_t>{}(x.value);
+          } else if constexpr (std::is_same_v<V, char>) {
+            return std::hash<char>{}(x);
+          } else {
+            static_assert(sizeof(V) == 0, "Unhandled Value variant alternative");
+          }
+        },
+        v.GetValue());
+  }
+};
+
+Type GetExpressionType(const std::shared_ptr<Expression>& expression) {
+  switch (expression->expr_type) {
+    case ExpressionType::kVariable:
+      return std::static_pointer_cast<Variable>(expression)->type;
+    case ExpressionType::kConst:
+      return std::static_pointer_cast<Const>(expression)->value.GetType();
+    default:
+      THROW_NOT_IMPLEMENTED;
+  }
+}
+
+Type GetSumOutputType(Type input_type) {
+  switch (input_type) {
+    case Type::kInt16:
+    case Type::kInt32:
+      return Type::kInt64;
+    case Type::kInt64:
+    case Type::kInt128:
+      return Type::kInt128;
+    default:
+      THROW_NOT_IMPLEMENTED;
+  }
+}
+
+Type GetAggregationOutputType(const AggregationUnit& unit) {
+  if (unit.type == AggregationType::kCount || unit.type == AggregationType::kDistinct) {
+    return Type::kInt64;
+  }
+  if (unit.type == AggregationType::kSum) {
+    return GetSumOutputType(GetExpressionType(unit.expression));
+  }
+  if (unit.type == AggregationType::kMin || unit.type == AggregationType::kMax) {
+    return GetExpressionType(unit.expression);
+  }
+  THROW_NOT_IMPLEMENTED;
+}
+
+}  // namespace
+
+class GlobalAggregationStream : public IStream<std::shared_ptr<Batch>> {
+ public:
+  explicit GlobalAggregationStream(std::shared_ptr<GlobalAggregationOperator> op) : op_(std::move(op)) {
+    stream_ = Execute(op_->child);
+  }
+
+  std::optional<std::shared_ptr<Batch>> Next() override {
+    if (returned_) {
+      return std::nullopt;
+    }
+    returned_ = true;
+
+    const size_t n = op_->aggregations.size();
+
+    std::vector<Type> out_types;
+    out_types.reserve(n);
+    for (const auto& a : op_->aggregations) {
+      out_types.emplace_back(GetAggregationOutputType(a));
+    }
+
+    std::vector<int64_t> counts(n, 0);
+    std::vector<Int128> sum_acc(n, static_cast<Int128>(0));
+    std::vector<std::optional<Value>> minmax_acc(n);
+    std::vector<std::unordered_set<Value, ValueHash>> distinct_sets(n);
+
+    bool saw_any_rows = false;
+
+    while (auto batch_opt = stream_->Next()) {
+      std::shared_ptr<Batch> batch = batch_opt.value();
+      if (batch->Rows() == 0) {
+        continue;
+      }
+      saw_any_rows = true;
+
+      for (size_t i = 0; i < n; ++i) {
+        const auto& unit = op_->aggregations[i];
+        switch (unit.type) {
+          case AggregationType::kCount: {
+            counts[i] += batch->Rows();
+            break;
+          }
+          case AggregationType::kSum: {
+            Column col = Evaluate(batch, unit.expression);
+            // Always accumulate in Int128, then cast/validate at the end if needed.
+            Value part = ReduceSum(col, Type::kInt128);
+            sum_acc[i] += std::get<Int128>(part.GetValue());
+            break;
+          }
+          case AggregationType::kMin: {
+            Column col = Evaluate(batch, unit.expression);
+            Value part = ReduceMin(col);
+            if (!minmax_acc[i].has_value() || part < *minmax_acc[i]) {
+              minmax_acc[i] = part;
+            }
+            break;
+          }
+          case AggregationType::kMax: {
+            Column col = Evaluate(batch, unit.expression);
+            Value part = ReduceMax(col);
+            if (!minmax_acc[i].has_value() || part > *minmax_acc[i]) {
+              minmax_acc[i] = part;
+            }
+            break;
+          }
+          case AggregationType::kDistinct: {
+            Column col = Evaluate(batch, unit.expression);
+            for (size_t r = 0; r < col.Size(); ++r) {
+              distinct_sets[i].insert(col[r]);
+            }
+            break;
+          }
+          default:
+            THROW_NOT_IMPLEMENTED;
+        }
+      }
+    }
+
+    std::vector<Field> fields;
+    fields.reserve(n);
+    for (size_t i = 0; i < n; ++i) {
+      fields.emplace_back(Field(op_->aggregations[i].name, out_types[i]));
+    }
+
+    std::vector<Column> columns;
+    columns.reserve(n);
+    for (const auto& f : fields) {
+      Dispatch([&]<Type type>(Tag<type>) { columns.emplace_back(Column(ArrayType<type>{})); }, f.type);
+    }
+
+    for (size_t i = 0; i < n; ++i) {
+      const auto& unit = op_->aggregations[i];
+      if (!saw_any_rows && (unit.type == AggregationType::kMin || unit.type == AggregationType::kMax)) {
+        THROW_RUNTIME_ERROR("MIN/MAX on empty input");
+      }
+
+      Value out_v = [&]() -> Value {
+        if (unit.type == AggregationType::kCount) {
+          return Value(static_cast<int64_t>(counts[i]));
+        }
+        if (unit.type == AggregationType::kDistinct) {
+          return Value(static_cast<int64_t>(distinct_sets[i].size()));
+        }
+        if (unit.type == AggregationType::kSum) {
+          if (out_types[i] == Type::kInt128) {
+            return Value(sum_acc[i]);
+          }
+          if (sum_acc[i] > static_cast<Int128>(std::numeric_limits<int64_t>::max()) ||
+              sum_acc[i] < static_cast<Int128>(std::numeric_limits<int64_t>::min())) {
+            THROW_RUNTIME_ERROR("Overlflow");
+          }
+          return Value(static_cast<int64_t>(sum_acc[i]));
+        }
+        if (unit.type == AggregationType::kMin || unit.type == AggregationType::kMax) {
+          return *minmax_acc[i];
+        }
+        THROW_NOT_IMPLEMENTED;
+      }();
+
+      Column::GenericColumn& column = columns[i].Values();
+      Value::GenericValue value = out_v.GetValue();
+      std::visit(
+          [value]<Type type>(ArrayType<type>& col) -> void {
+            if (std::holds_alternative<PhysicalType<type>>(value)) {
+              col.emplace_back(std::get<PhysicalType<type>>(value));
+            } else {
+              THROW_RUNTIME_ERROR("Type mismatch");
+            }
+          },
+          column);
+    }
+
+    return std::make_shared<Batch>(std::move(columns), Schema(std::move(fields)));
+  }
+
+ private:
+  bool returned_ = false;
+  std::shared_ptr<GlobalAggregationOperator> op_;
+  std::shared_ptr<IStream<std::shared_ptr<Batch>>> stream_;
 };
 
 class FilterStream : public IStream<std::shared_ptr<Batch>> {
@@ -540,6 +757,8 @@ std::shared_ptr<IStream<std::shared_ptr<Batch>>> Execute(std::shared_ptr<Operato
       return std::make_shared<ScanStream>(std::static_pointer_cast<ScanOperator>(op));
     case OperatorType::kCountTable:
       return std::make_shared<CountTableStream>(std::static_pointer_cast<CountTableOperator>(op));
+    case OperatorType::kGlobalAggregation:
+      return std::make_shared<GlobalAggregationStream>(std::static_pointer_cast<GlobalAggregationOperator>(op));
     case OperatorType::kConcat:
       return std::make_shared<ConcatStream>(std::static_pointer_cast<ConcatOperator>(op));
     case OperatorType::kFilter:

@@ -130,22 +130,19 @@ class QueryMaker {
   QueryInfo MakeQ2() {
     // SELECT SUM(AdvEngineID), COUNT(*), AVG(ResolutionWidth) FROM hits;
 
-    auto sums = MakeAggregate(
+    auto sums = MakeGlobalAggregation(
         MakeScan(input_, S({"AdvEngineID", "ResolutionWidth"})),
-        MakeAggregation(
-            {AggregationUnit{AggregationType::kSum, MakeVariable("AdvEngineID", Type::kInt16), "sum_adv"},
-             AggregationUnit{AggregationType::kSum, MakeVariable("ResolutionWidth", Type::kInt16), "sum_res"}},
-            {}));
+        {AggregationUnit{AggregationType::kSum, MakeVariable("AdvEngineID", Type::kInt16), "sum"},
+         AggregationUnit{AggregationType::kSum, MakeVariable("ResolutionWidth", Type::kInt16), "total"}});
 
-    auto count = MakeCountTable(input_, "count");
+    auto cnt = MakeCountTable(input_, "count");
 
-    std::shared_ptr<Operator> plan =
-        MakeProject(MakeConcat({sums, count}),
-                    {ProjectionUnit{MakeVariable("sum_adv", Type::kInt64), "sum"},
-                     ProjectionUnit{MakeVariable("count", Type::kInt64), "count"},
-                     ProjectionUnit{MakeBinary(BinaryFunction::kDiv, MakeVariable("sum_res", Type::kInt64),
-                                               MakeVariable("count", Type::kInt64)),
-                                    "total"}});
+    std::shared_ptr<Operator> plan = MakeProject(
+        MakeConcat({sums, cnt}), {ProjectionUnit{MakeVariable("sum", Type::kInt64), "sum"},
+                                  ProjectionUnit{MakeVariable("count", Type::kInt64), "count"},
+                                  ProjectionUnit{MakeBinary(BinaryFunction::kDiv, MakeVariable("total", Type::kInt64),
+                                                            MakeVariable("count", Type::kInt64)),
+                                                 "total"}});
 
     return QueryInfo{.plan = plan, .name = "Q2"};
   }
@@ -153,18 +150,17 @@ class QueryMaker {
   QueryInfo MakeQ3() {
     // SELECT AVG(UserID) FROM hits;
 
-    auto sum_user = MakeAggregate(
-        MakeScan(input_, S({"UserID"})),
-        MakeAggregation({AggregationUnit{AggregationType::kSum, MakeVariable("UserID", Type::kInt64), "sum_user"}},
-                        {}));
+    auto sum_user =
+        MakeGlobalAggregation(MakeScan(input_, S({"UserID"})),
+                              {AggregationUnit{AggregationType::kSum, MakeVariable("UserID", Type::kInt64), "sum"}});
 
-    auto count = MakeCountTable(input_, "count");
+    auto cnt = MakeCountTable(input_, "count");
 
-    std::shared_ptr<Operator> plan =
-        MakeProject(MakeConcat({sum_user, count}),
-                    {ProjectionUnit{MakeBinary(BinaryFunction::kDiv, MakeVariable("sum_user", Type::kInt128),
-                                               MakeVariable("count", Type::kInt64)),
-                                    "total"}});
+    std::shared_ptr<Operator> plan = MakeProject(
+        MakeConcat({sum_user, cnt}),
+        {ProjectionUnit{
+            MakeBinary(BinaryFunction::kDiv, MakeVariable("sum", Type::kInt128), MakeVariable("count", Type::kInt64)),
+            "total"}});
 
     return QueryInfo{.plan = plan, .name = "Q3"};
   }
@@ -172,10 +168,9 @@ class QueryMaker {
   QueryInfo MakeQ4() {
     // SELECT COUNT(DISTINCT UserID) FROM hits;
 
-    std::shared_ptr<Operator> plan = MakeAggregate(
+    std::shared_ptr<Operator> plan = MakeGlobalAggregation(
         MakeScan(input_, S({"UserID"})),
-        MakeAggregation({AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "distinct"}},
-                        {}));
+        {AggregationUnit{AggregationType::kDistinct, MakeVariable("UserID", Type::kInt64), "distinct"}});
 
     return QueryInfo{.plan = plan, .name = "Q4"};
   }
