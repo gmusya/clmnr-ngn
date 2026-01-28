@@ -16,6 +16,7 @@ add_executable(ngn-exec-test
   ut/batch_test.cpp
   ut/expression_test.cpp
   ut/global_aggregation_test.cpp
+  ut/global_agg_simd_test.cpp
   ut/kernel_test.cpp
 )
 
@@ -25,6 +26,7 @@ target_link_libraries(ngn-exec-test PUBLIC ngn-exec GTest::gtest_main)
 
 add_executable(ngn-exec-bench
   bench/kernel_bench.cpp
+  bench/global_agg_bench.cpp
 )
 
 target_link_libraries(ngn-exec-bench PUBLIC ngn-exec benchmark::benchmark_main)
