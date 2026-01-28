@@ -15,6 +15,7 @@ Column Div(const Column&, const Column&);
 
 // Reduction kernels (return a single scalar value)
 Value ReduceSum(const Column& operand, Type output_type);
+Value ReduceSumSimd256(const Column& operand, Type output_type);
 Value ReduceMin(const Column& operand);
 Value ReduceMax(const Column& operand);
 

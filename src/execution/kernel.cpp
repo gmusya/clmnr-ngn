@@ -4,6 +4,9 @@
 #include <limits>
 #include <regex>
 
+#include "simde/x86/avx2.h"
+#include "simde/x86/avx512.h"
+#include "simde/x86/sse2.h"
 #include "src/core/type.h"
 #include "src/util/assert.h"
 #include "src/util/macro.h"
@@ -48,6 +51,8 @@ Int128 SumToInt128(const ArrayType<type>& arr) {
   }
   return sum;
 }
+
+// (removed) previous SIMD helper that accumulated to Int128
 
 template <Type type>
 ArrayType<type> Add(const ArrayType<type>& lhs, const ArrayType<type>& rhs) {
@@ -197,6 +202,92 @@ Value ReduceSum(const Column& operand, Type output_type) {
         }
       },
       operand.GetType());
+}
+
+Value ReduceSumSimd256(const Column& operand, Type output_type) {
+  if (operand.GetType() == Type::kInt64) {
+    const auto& arr = std::get<ArrayType<Type::kInt64>>(operand.Values());
+    const int64_t* ptr = arr.data();
+    const size_t n = arr.size();
+
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpsabi"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpsabi"
+#endif
+    simde__m256i vacc = simde_mm256_setzero_si256();
+    size_t i = 0;
+    for (; i + 4 <= n; i += 4) {
+      simde__m256i v = simde_mm256_loadu_si256(reinterpret_cast<const simde__m256i*>(ptr + i));
+      vacc = simde_mm256_add_epi64(vacc, v);
+    }
+    alignas(32) uint64_t lanes[4] = {0, 0, 0, 0};
+    simde_mm256_store_si256(reinterpret_cast<simde__m256i*>(lanes), vacc);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
+    uint64_t sum_u = lanes[0] + lanes[1] + lanes[2] + lanes[3];
+    for (; i < n; ++i) {
+      sum_u += static_cast<uint64_t>(ptr[i]);
+    }
+
+    int64_t sum64 = static_cast<int64_t>(sum_u);
+    if (output_type == Type::kInt128) {
+      return Value(static_cast<Int128>(sum64));
+    }
+    if (output_type == Type::kInt64) {
+      return Value(sum64);
+    }
+    THROW_NOT_IMPLEMENTED;
+  } else if (operand.GetType() == Type::kInt16) {
+    const auto& arr = std::get<ArrayType<Type::kInt16>>(operand.Values());
+    const int16_t* ptr = arr.data();
+    const size_t n = arr.size();
+
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpsabi"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpsabi"
+#endif
+    simde__m256i vacc32 = simde_mm256_setzero_si256();
+    size_t i = 0;
+    for (; i + 16 <= n; i += 16) {
+      simde__m256i v16 = simde_mm256_loadu_si256(reinterpret_cast<const simde__m256i*>(ptr + i));
+      const simde__m256i ones = simde_mm256_set1_epi16(1);
+      simde__m256i sum32 = simde_mm256_madd_epi16(v16, ones);  // sums pairs to 32-bit
+      vacc32 = simde_mm256_add_epi32(vacc32, sum32);
+    }
+    alignas(32) int32_t lanes32[8];
+    simde_mm256_store_si256(reinterpret_cast<simde__m256i*>(lanes32), vacc32);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+    int64_t sum64 = 0;
+    for (int k = 0; k < 8; ++k) {
+      sum64 += static_cast<int64_t>(lanes32[k]);
+    }
+    for (; i < n; ++i) {
+      sum64 += static_cast<int64_t>(ptr[i]);
+    }
+    if (output_type == Type::kInt64) {
+      return Value(sum64);
+    }
+    if (output_type == Type::kInt128) {
+      return Value(static_cast<Int128>(sum64));
+    }
+    THROW_NOT_IMPLEMENTED;
+  } else {
+    THROW_NOT_IMPLEMENTED;
+  }
 }
 
 Value ReduceMin(const Column& operand) {

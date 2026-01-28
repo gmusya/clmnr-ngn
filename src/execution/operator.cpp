@@ -338,9 +338,12 @@ class GlobalAggregationStream : public IStream<std::shared_ptr<Batch>> {
           }
           case AggregationType::kSum: {
             Column col = Evaluate(batch, unit.expression);
-            // Always accumulate in Int128, then cast/validate at the end if needed.
-            Value part = ReduceSum(col, Type::kInt128);
-            sum_acc[i] += std::get<Int128>(part.GetValue());
+            Value part = ReduceSumSimd256(col, out_types[i]);
+            if (out_types[i] == Type::kInt128) {
+              sum_acc[i] += std::get<Int128>(part.GetValue());
+            } else {
+              sum_acc[i] += static_cast<Int128>(std::get<int64_t>(part.GetValue()));
+            }
             break;
           }
           case AggregationType::kMin: {
