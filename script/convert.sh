@@ -3,14 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if [[ $# -lt 3 ]]; then
-  echo "Usage: script/convert.sh <input_csv> <input_schema> <output_columnar>" >&2
+if [[ $# -lt 2 ]]; then
+  echo "Usage: script/convert.sh <input_csv> <output_columnar> [input_schema]" >&2
   exit 2
 fi
 
 INPUT_CSV="$1"
-INPUT_SCHEMA="$2"
-COLUMNAR="$3"
+COLUMNAR="$2"
+INPUT_SCHEMA="${3:-${ROOT_DIR}/hits.schema}"
 
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 OUTPUT_FOLDER="${OUTPUT_FOLDER:-${ROOT_DIR}/build}"

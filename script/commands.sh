@@ -4,7 +4,7 @@ cd repo
 
 ./script/build.sh
 
-./script/convert.sh ${INPUT_CSV} ${INPUT_SCHEMA} ${COLUMNAR}
+./script/convert.sh ${INPUT_CSV} ${COLUMNAR}
 
 for QUERY_NUM in {0..42}; do
   OUTPUT=${RESULTS}/query_${QUERY_NUM}.csv
