@@ -2,6 +2,8 @@ source env.sh
 git clone --branch "${BRANCH}" "${REPO_URL}" repo
 cd repo
 
+./script/setup.sh
+
 ./script/build.sh
 
 ./script/convert.sh ${INPUT_CSV} ${COLUMNAR}
