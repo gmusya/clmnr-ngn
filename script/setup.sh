@@ -21,8 +21,6 @@ echo "deb [signed-by=/usr/share/keyrings/kitware.gpg] https://apt.kitware.com/ub
 apt-get update
 apt-get install -y --no-install-recommends clang-20 lld-20 cmake
 
-rm -rf /var/lib/apt/lists/*
-
 export CC=clang-20
 export CXX=clang++-20
 export PATH="/root/.local/bin:${PATH}"
