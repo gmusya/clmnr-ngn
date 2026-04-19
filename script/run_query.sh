@@ -4,14 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ $# -lt 4 ]]; then
-  echo "Usage: script/run_query.sh <query_num> <columnar> <output_dir> <logs_dir>" >&2
+  echo "Usage: script/run_query.sh <query_num> <columnar> <output_csv> <log_file>" >&2
   exit 2
 fi
 
 QUERY_NUM="$1"
 COLUMNAR="$2"
-OUTPUT="$3"
-LOGS="$4"
+OUTPUT_CSV="$3"
+LOG_FILE="$4"
 
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 OUTPUT_FOLDER="${OUTPUT_FOLDER:-${ROOT_DIR}/build}"
@@ -34,12 +34,35 @@ if [[ ! -f "${SCHEMA}" ]]; then
   exit 2
 fi
 
-mkdir -p "${OUTPUT}"
-mkdir -p "${LOGS}"
+mkdir -p "$(dirname "${OUTPUT_CSV}")"
+mkdir -p "$(dirname "${LOG_FILE}")"
+
+TEMP_OUTPUT_DIR="$(mktemp -d)"
+cleanup() {
+  rm -rf "${TEMP_OUTPUT_DIR}"
+}
+trap cleanup EXIT
 
 "${BIN}" \
   --input "${COLUMNAR}" \
   --schema "${SCHEMA}" \
-  --output_dir "${OUTPUT}" \
+  --output_dir "${TEMP_OUTPUT_DIR}" \
   --queries="${QUERY_NUM}" \
-  2>&1 | tee "${LOGS}/q${QUERY_NUM}.log"
+  2>&1 | tee "${LOG_FILE}"
+
+EXPECTED_CSV="${TEMP_OUTPUT_DIR}/q${QUERY_NUM}.csv"
+if [[ -f "${EXPECTED_CSV}" ]]; then
+  mv "${EXPECTED_CSV}" "${OUTPUT_CSV}"
+  exit 0
+fi
+
+shopt -s nullglob
+CSV_CANDIDATES=("${TEMP_OUTPUT_DIR}"/*.csv)
+shopt -u nullglob
+if [[ "${#CSV_CANDIDATES[@]}" -eq 1 ]]; then
+  mv "${CSV_CANDIDATES[0]}" "${OUTPUT_CSV}"
+  exit 0
+fi
+
+echo "ERROR: query output CSV not found for Q${QUERY_NUM} in ${TEMP_OUTPUT_DIR}" >&2
+exit 3
