@@ -27,8 +27,9 @@ mkdir -p "${RUN_RESULTS_DIR}"
 echo "query,time_ms" > "${TIMES_CSV}"
 
 for QUERY_NUM in $(seq 0 42); do
-  OUTPUT_CSV="${RUN_RESULTS_DIR}/query_${QUERY_NUM}.csv"
-  LOG_FILE="${RUN_RESULTS_DIR}/query_${QUERY_NUM}.log"
+  QUERY_NUM_PADDED="$(printf "%02d" "${QUERY_NUM}")"
+  OUTPUT_CSV="${RUN_RESULTS_DIR}/query_${QUERY_NUM_PADDED}.csv"
+  LOG_FILE="${RUN_RESULTS_DIR}/query_${QUERY_NUM_PADDED}.log"
   TIME_FILE="$(mktemp)"
 
   if /usr/bin/time -f "%e" -o "${TIME_FILE}" \

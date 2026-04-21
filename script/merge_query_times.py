@@ -77,12 +77,19 @@ def read_query_times(csv_path: Path) -> Dict[str, str]:
     return result
 
 
+def format_query_file_suffix(query: str) -> str:
+    q = query.strip()
+    if q.isdigit():
+        return f"{int(q):02d}"
+    return q
+
+
 def expected_query_file(expected_results_dir: Path, query: str) -> Path:
-    return expected_results_dir / f"query_{query}.csv"
+    return expected_results_dir / f"query_{format_query_file_suffix(query)}.csv"
 
 
 def actual_query_file(run_dir: Path, query: str) -> Path:
-    return run_dir / f"query_{query}.csv"
+    return run_dir / f"query_{format_query_file_suffix(query)}.csv"
 
 
 def apply_wa_verdicts(
