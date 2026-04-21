@@ -207,6 +207,12 @@ Value ReduceSum(const Column& operand, Type output_type) {
 Value ReduceSumSimd256(const Column& operand, Type output_type) {
   if (operand.GetType() == Type::kInt64) {
     const auto& arr = std::get<ArrayType<Type::kInt64>>(operand.Values());
+    if (output_type == Type::kInt128) {
+      // Int64 SIMD horizontal accumulation wraps on overflow before widening.
+      // For Int128 output we must preserve full precision.
+      return Value(internal::SumToInt128(arr));
+    }
+
     const int64_t* ptr = arr.data();
     const size_t n = arr.size();
 
@@ -237,9 +243,6 @@ Value ReduceSumSimd256(const Column& operand, Type output_type) {
     }
 
     int64_t sum64 = static_cast<int64_t>(sum_u);
-    if (output_type == Type::kInt128) {
-      return Value(static_cast<Int128>(sum64));
-    }
     if (output_type == Type::kInt64) {
       return Value(sum64);
     }
