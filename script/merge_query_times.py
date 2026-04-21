@@ -31,6 +31,14 @@ def parse_args() -> argparse.Namespace:
         default="results-main/query_times_merged.csv",
         help="Path to output merged CSV file.",
     )
+    parser.add_argument(
+        "--expected-results-dir",
+        default=None,
+        help=(
+            "Directory with expected query_<N>.csv files. "
+            "When provided, mismatched answers are marked as WA instead of time."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -69,6 +77,31 @@ def read_query_times(csv_path: Path) -> Dict[str, str]:
     return result
 
 
+def expected_query_file(expected_results_dir: Path, query: str) -> Path:
+    return expected_results_dir / f"query_{query}.csv"
+
+
+def actual_query_file(run_dir: Path, query: str) -> Path:
+    return run_dir / f"query_{query}.csv"
+
+
+def apply_wa_verdicts(
+    run_data: Dict[str, Dict[str, str]],
+    run_dirs: Dict[str, Path],
+    expected_results_dir: Path,
+) -> None:
+    for run_name, per_query_times in run_data.items():
+        run_dir = run_dirs[run_name]
+        for query in list(per_query_times.keys()):
+            expected_path = expected_query_file(expected_results_dir, query)
+            actual_path = actual_query_file(run_dir, query)
+            if not expected_path.is_file() or not actual_path.is_file():
+                per_query_times[query] = "WA"
+                continue
+            if expected_path.read_bytes() != actual_path.read_bytes():
+                per_query_times[query] = "WA"
+
+
 def merge_runs(run_data: Dict[str, Dict[str, str]]) -> List[Dict[str, str]]:
     all_queries = sorted(
         {query for per_run in run_data.values() for query in per_run.keys()},
@@ -100,6 +133,11 @@ def main() -> int:
     args = parse_args()
     results_root = Path(args.results_root).resolve()
     output_path = Path(args.output).resolve()
+    expected_results_dir = (
+        Path(args.expected_results_dir).resolve()
+        if args.expected_results_dir is not None
+        else None
+    )
 
     if not results_root.exists():
         raise FileNotFoundError(f"results root not found: {results_root}")
@@ -111,12 +149,21 @@ def main() -> int:
         )
 
     run_data: Dict[str, Dict[str, str]] = {}
+    run_dirs: Dict[str, Path] = {}
     for run_name, csv_path in discovered:
         if run_name in run_data:
             raise ValueError(
                 f"duplicate run name '{run_name}' detected while scanning {results_root}"
             )
         run_data[run_name] = read_query_times(csv_path)
+        run_dirs[run_name] = csv_path.parent
+
+    if expected_results_dir is not None:
+        if not expected_results_dir.is_dir():
+            raise NotADirectoryError(
+                f"expected results directory not found: {expected_results_dir}"
+            )
+        apply_wa_verdicts(run_data, run_dirs, expected_results_dir)
 
     run_names = sorted(run_data.keys())
     rows = merge_runs(run_data)
