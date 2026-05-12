@@ -1,14 +1,54 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+
+log() {
+  printf '==> %s\n' "$*" >&2
+}
+
+CURRENT_STEP=""
+
+on_error() {
+  local status=$?
+  if [[ -n "${CURRENT_STEP}" ]]; then
+    log "FAILED: ${CURRENT_STEP} (exit ${status})"
+  else
+    log "FAILED: unexpected error (exit ${status})"
+  fi
+}
+
+trap on_error ERR
+
+run_step() {
+  local name="$1"
+  shift
+
+  CURRENT_STEP="${name}"
+  log "START: ${name}"
+  set +e
+  "$@"
+  local status=$?
+  set -e
+
+  if [[ ${status} -ne 0 ]]; then
+    log "FAILED: ${name} (exit ${status})"
+    exit "${status}"
+  fi
+
+  log "DONE: ${name}"
+  CURRENT_STEP=""
+}
 
 source /bench/env.sh
 
-git clone --branch "${BRANCH}" "${REPO_URL}" repo
+log "Benchmark configuration: repo=${REPO_URL} branch=${BRANCH}"
+log "Data paths: input=${INPUT_CSV} columnar=${COLUMNAR} results=${RESULTS}"
+
+run_step "clone repository" git clone --branch "${BRANCH}" "${REPO_URL}" repo
 cd repo
 
-source ./script/setup.sh
-bash ./script/build.sh
-bash ./script/convert.sh "${INPUT_CSV}" "${COLUMNAR}"
+run_step "install dependencies" bash ./script/setup.sh
+run_step "build project" bash ./script/build.sh
+run_step "convert input CSV to columnar" bash ./script/convert.sh "${INPUT_CSV}" "${COLUMNAR}"
 
 if [[ "${REPO_URL}" =~ github\.com[:/]([^/]+)/ ]]; then
   GITHUB_USER_NAME="${BASH_REMATCH[1]}"
@@ -25,6 +65,7 @@ TIMES_CSV="${RUN_RESULTS_DIR}/query_times.csv"
 
 mkdir -p "${RUN_RESULTS_DIR}"
 echo "query,time_ms" > "${TIMES_CSV}"
+log "Writing benchmark results to ${RUN_RESULTS_DIR}"
 
 for QUERY_NUM in $(seq 0 42); do
   QUERY_NUM_PADDED="$(printf "%02d" "${QUERY_NUM}")"
@@ -32,12 +73,15 @@ for QUERY_NUM in $(seq 0 42); do
   LOG_FILE="${RUN_RESULTS_DIR}/query_${QUERY_NUM_PADDED}.log"
   TIME_FILE="$(mktemp)"
 
+  log "START: query ${QUERY_NUM_PADDED}"
   if /usr/bin/time -f "%e" -o "${TIME_FILE}" \
     bash ./script/run_query.sh "${QUERY_NUM}" "${COLUMNAR}" "${OUTPUT_CSV}" "${LOG_FILE}"; then
     QUERY_TIME_MS="$(awk 'NF { printf "%.0f", $1 * 1000 }' "${TIME_FILE}")"
     QUERY_TIME_MS="${QUERY_TIME_MS:-NA}"
+    log "DONE: query ${QUERY_NUM_PADDED} (${QUERY_TIME_MS} ms)"
   else
     QUERY_TIME_MS="NA"
+    log "FAILED: query ${QUERY_NUM_PADDED} (recording NA and continuing)"
   fi
 
   rm -f "${TIME_FILE}"
