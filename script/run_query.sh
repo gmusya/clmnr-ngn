@@ -12,6 +12,7 @@ QUERY_NUM="$1"
 COLUMNAR="$2"
 OUTPUT_CSV="$3"
 LOG_FILE="$4"
+QUERY_NUM_PADDED="$(printf "%02d" "${QUERY_NUM}")"
 
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 OUTPUT_FOLDER="${OUTPUT_FOLDER:-${ROOT_DIR}/build}"
@@ -50,7 +51,7 @@ trap cleanup EXIT
   --queries="${QUERY_NUM}" \
   2>&1 | tee "${LOG_FILE}"
 
-EXPECTED_CSV="${TEMP_OUTPUT_DIR}/q${QUERY_NUM}.csv"
+EXPECTED_CSV="${TEMP_OUTPUT_DIR}/q${QUERY_NUM_PADDED}.csv"
 if [[ -f "${EXPECTED_CSV}" ]]; then
   mv "${EXPECTED_CSV}" "${OUTPUT_CSV}"
   exit 0

@@ -1,6 +1,7 @@
 #include <chrono>
 #include <exception>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <set>
@@ -18,13 +19,19 @@
 
 ABSL_FLAG(std::string, input, "", "Input columnar file (.clmnr)");
 ABSL_FLAG(std::string, schema, "", "Schema file (.schema)");
-ABSL_FLAG(std::string, output_dir, "", "Output directory for CSV results. Files will be named q{i}.csv");
+ABSL_FLAG(std::string, output_dir, "", "Output directory for CSV results. Files will be named q{ii}.csv");
 ABSL_FLAG(std::string, queries, "", "Comma-separated list of queries to run (e.g., '0,5,10' or 'Q0,Q5,Q10')");
 ABSL_FLAG(std::string, skip, "", "Comma-separated list of queries to skip (e.g., '0,5,10' or 'Q0,Q5,Q10')");
 ABSL_FLAG(int32_t, from, -1, "First query index to run (inclusive)");
 ABSL_FLAG(int32_t, to, -1, "Last query index to run (inclusive)");
 
 namespace {
+
+std::string FormatQueryIndex(size_t index) {
+  std::ostringstream os;
+  os << std::setfill('0') << std::setw(2) << index;
+  return os.str();
+}
 
 std::set<int> ParseQueryList(const std::string& str) {
   std::set<int> result;
@@ -1139,7 +1146,7 @@ int main(int argc, char** argv) {
     try {
       const auto start = std::chrono::steady_clock::now();
 
-      const std::filesystem::path out_path = std::filesystem::path(output_dir) / ("q" + std::to_string(i) + ".csv");
+      const std::filesystem::path out_path = std::filesystem::path(output_dir) / ("q" + FormatQueryIndex(i) + ".csv");
       ngn::CsvWriter writer(out_path.string());
       auto stream = ngn::Execute(q.plan);
       while (const auto& batch = stream->Next()) {
