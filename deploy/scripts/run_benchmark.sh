@@ -4,13 +4,60 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+usage() {
+  cat >&2 <<'EOF'
+Usage:
+  deploy/scripts/run_benchmark.sh [--dataset small|big] <REPO_URL> <BRANCH>
+
+Options:
+  --dataset small|big  Dataset to benchmark (default: small)
+EOF
+}
+
+DATASET="small"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dataset)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --dataset requires a value" >&2
+        usage
+        exit 2
+      fi
+      DATASET="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "ERROR: unknown option: $1" >&2
+      usage
+      exit 2
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
 if [[ $# -lt 2 ]]; then
-  echo "Usage: deploy/scripts/run_benchmark.sh <REPO_URL> <BRANCH>" >&2
+  usage
   exit 2
 fi
 
 REPO_URL="$1"
 BRANCH="$2"
+
+if [[ "${DATASET}" != "small" && "${DATASET}" != "big" ]]; then
+  echo "ERROR: --dataset must be 'small' or 'big', got '${DATASET}'" >&2
+  exit 2
+fi
 
 SSH_USER="${SSH_USER:-ubuntu}"
 VM_IP=$(terraform -chdir="${DEPLOY_DIR}" output -raw external_ip)
@@ -20,12 +67,14 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o Connect
 echo "==> Running benchmark on ${SSH_TARGET}"
 echo "    Repo:   ${REPO_URL}"
 echo "    Branch: ${BRANCH}"
+echo "    Dataset: ${DATASET}"
 
 BENCHMARK_OUTPUT="$(
   ssh ${SSH_OPTS} "${SSH_TARGET}" \
     "docker run --rm \
       -e REPO_URL='${REPO_URL}' \
       -e BRANCH='${BRANCH}' \
+      -e DATASET='${DATASET}' \
       -v ~/data:/data \
       bench" 2>&1 | tee /dev/stderr
 )"

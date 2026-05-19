@@ -40,7 +40,12 @@ run_step() {
 
 source /bench/env.sh
 
-log "Benchmark configuration: repo=${REPO_URL} branch=${BRANCH}"
+if [[ "${DATASET}" != "small" && "${DATASET}" != "big" ]]; then
+  echo "ERROR: DATASET must be 'small' or 'big', got '${DATASET}'" >&2
+  exit 2
+fi
+
+log "Benchmark configuration: repo=${REPO_URL} branch=${BRANCH} dataset=${DATASET}"
 log "Data paths: input=${INPUT_CSV} columnar=${COLUMNAR} results=${RESULTS}"
 
 run_step "clone repository" git clone --branch "${BRANCH}" "${REPO_URL}" repo
@@ -59,7 +64,7 @@ fi
 
 COMMIT_HASH="$(git rev-parse --short HEAD)"
 
-RESULTS_ROOT="${RESULTS}"
+RESULTS_ROOT="${RESULTS}/${DATASET}"
 RUN_RESULTS_DIR="${RESULTS_ROOT}/${GITHUB_USER_NAME}/${COMMIT_HASH}"
 TIMES_CSV="${RUN_RESULTS_DIR}/query_times.csv"
 
