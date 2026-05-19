@@ -12,7 +12,7 @@ ABSL_FLAG(std::string, input, "", "Input CSV file");
 ABSL_FLAG(std::string, output, "", "Output columnar file");
 ABSL_FLAG(std::string, schema, "", "Schema file");
 
-ABSL_FLAG(int64_t, rows_per_log, std::numeric_limits<int64_t>::max(), "Rows to process for one log message");
+ABSL_FLAG(int64_t, rows_per_log, 1'000'000, "Rows to process for one log message");
 ABSL_FLAG(int64_t, row_group_size, 65536, "Rows per row group in output columnar file");
 
 namespace {
